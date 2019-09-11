@@ -1,0 +1,113 @@
+$w: #fff;
+$b: #000;
+$bg-main: #f5f7fa;
+$bg-pr: #1785fb;
+$lgn-pl: #8dabc4;
+$btn-pr: #56d86c;
+$btn-sc: #939496;
+$bg-err: #1f46e9;
+$cl-err: #ff4c43;
+$cl-pr: #2c405a;
+$ctn-text-bdr: #c5d9e8;
+$cl-ctn-text: #292f36;
+$cl-sel: #145bbc;
+$cl-high: #b5d3fa;
+
+// $bg-pop: #010101;
+// $ctn-auto-bdr: #979797;
+// $bg-auto-high: #615959;
+// $bg-tag: #f9f9fb;
+// $sl-bg: #e9e9e9;
+// $dz-bdr: #dde4ff;
+// $dz-txt: #3f536e;
+// $up-err: #f25544;
+// $bg-prog: #d8e5ee;
+
+// Full height-width
+%fhw{  
+  height: 100%;
+  width: 100%;
+}
+
+// Justify content: space between
+%j-s-b {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+// Justify content: center
+%j-c {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+// Justify content: flex-start
+%j-f-s {
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+}
+
+// Justify content: flex-end
+%j-f-e {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+}
+
+// Position absolute mixin
+@mixin pa($top:"", $left:"", $bottom:"", $right:"", $unit: "px") {
+  position: absolute;
+  @if $top != ""{
+    top: #{$top}#{$unit};
+  }
+  @if $left != ""{
+    left: #{$left}#{$unit};
+  }
+  @if $bottom != ""{
+    bottom: #{$bottom}#{$unit};
+  }
+  @if $right != ""{
+    right: #{$right}#{$unit};
+  }
+}
+
+// Mixin for height-width
+@mixin hw($h:"", $w:"", $unit: "px") {  
+  @if $h != ""{
+    height: #{$h}#{$unit};
+  }
+  @if $w != ""{
+    width: #{$w}#{$unit};
+  }
+}
+
+// Prefix & Keyframes mixins
+@mixin prefixed($property, $value) {
+  -webkit-#{$property}: #{$value}; /* Safari */
+  -khtml-#{$property}: #{$value}; /* Konqueror HTML */  
+  -moz-#{$property}: #{$value}; /* Firefox */
+  -ms-#{$property}: #{$value}; /* Internet Explorer/Edge */
+  -o-#{$property}: #{$value}; /* Opera */
+  #{$property}: #{$value}; /* Non-prefixed version */
+}
+
+@mixin keyframes($name) {
+  @-webkit-keyframes #{$name} {
+    @content;
+  }
+  @-moz-keyframes #{$name} {
+    @content;
+  }
+  @-ms-keyframes #{$name} {
+    @content;
+  }
+  @-o-keyframes #{$name} {
+    @content;
+  }
+  @keyframes #{$name} {
+    @content;
+  }
+}

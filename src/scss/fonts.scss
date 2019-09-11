@@ -1,0 +1,17 @@
+$sp-r: 'sofia-pro-r';
+@font-face {
+  font-family: $sp-r;
+  src: url(../fonts/Sofia-Pro-Regular.ttf) format('truetype');
+}
+
+$sp-m: 'sofia-pro-m';
+@font-face {
+  font-family: $sp-m;
+  src: url(../fonts/Sofia-Pro-Medium.ttf) format('truetype');
+}
+
+$sp-l: 'sofia-pro-l';
+@font-face {
+  font-family: $sp-l;
+  src: url(../fonts/Sofia-Pro-Light.ttf) format('truetype');
+}
