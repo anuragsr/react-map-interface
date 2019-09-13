@@ -4,7 +4,7 @@ import Cookies from 'universal-cookie'
 import Background from './components/Background'
 import MapComponent from './components/MapComponent'
 import HttpService from './services/HttpService'
-import { l, auth } from './helpers/common'
+import { l, auth, pd } from './helpers/common'
 
 import './scss/app.scss'
 
@@ -30,12 +30,12 @@ export default class App extends Component {
         password: ck.x_p
       }, this.login)
     }
-    // else{
-    //   this.setState({
-    //     username: 'contenter',
-    //     password: 'ExXgB6QjfQUwyMm7gcEd'
-    //   }, this.login)
-    // }
+    else{
+      this.setState({
+        username: 'contenter',
+        password: 'ExXgB6QjfQUwyMm7gcEd'
+      }, this.login)
+    }
   }
 
   handleInputChange = event => {
@@ -47,7 +47,7 @@ export default class App extends Component {
   }
 
   login = e => {
-    e && e.preventDefault()
+    pd(e)
     // l(this.state)
     this.http
       .post('/api/v1/login', {
@@ -95,8 +95,8 @@ export default class App extends Component {
 
   render() {
     return (
-      <div className="app-outer">
-        {!this.state.isAuth && <div className="h-100">
+      <>
+        {/* {!this.state.isAuth && <div className="h-100">
           <Background />
           <div className="login-outer">
             <div className="login-box">
@@ -119,8 +119,9 @@ export default class App extends Component {
         </div>}
         {this.state.isAuth && <div className="h-100">
           <MapComponent logout={this.logout} />
-        </div>}
-      </div>
+        </div>} */}
+        <MapComponent/>
+      </>
     )
   }
 }

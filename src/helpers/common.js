@@ -11,3 +11,4 @@ export const rand = length => {
   return randomStr
 }
 export const sp = e => e && e.stopPropagation()
+export const pd = e => e && e.preventDefault()

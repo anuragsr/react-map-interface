@@ -23,6 +23,7 @@ yarn-debug.log*
 yarn-error.log*
 
 /extra
+/test
 vs.code-workspace
 dir.bat
 serve.bat

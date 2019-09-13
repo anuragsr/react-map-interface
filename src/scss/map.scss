@@ -1,0 +1,125 @@
+.map-outer{
+  @extend %fhw;
+  background: $bg-main;
+  font-family: $sp-r;
+	.navbar{
+	  // z-index: 1;
+	  box-shadow: 0 10px 20px 0 rgba($b, .1);
+	  background: $bg-pr;
+	  height: 60px;
+	  padding: 0;
+	  .navbar-brand{
+	    border-right: 1px solid rgba($w, .2);
+	    padding-left: 7px;
+	    padding-right: 7px;
+	    img{ @include hw(48, 48); }
+	  }
+	  .navbar-nav{
+	    padding-right: 10px;
+	    .dropdown-menu{
+	    	left: -135px;
+	    }
+	    .nav-item{
+	    	color: $w;
+	    	font-size: 15px;
+	    	&.dropdown{
+	    		border-left: 1px solid rgba($w, .2);
+	    	}
+	    }
+	    img.avatar{ @include hw(36, 36); }
+	  }
+	}	
+	.wrapper {
+		display: flex;
+		width: 100%;
+		height: calc(100% - 60px);
+		align-items: stretch;
+		.sidebar {
+			padding: 20px;
+			width: $sb-mg;
+			background: $w;
+			box-shadow: 1px 0 0 0 rgba($b, .05);
+			transition: all 0.3s;
+			&.hidden {
+				margin-left: -1 * $sb-mg;
+			}
+		}
+		.content {
+			@extend %fhw;
+			.ctn-icon{
+				@extend %j-c;
+				height: 40px;
+				width: 40px;
+				border-radius: 2px;
+				background: $w;
+				box-shadow: 0 1px 4px 0 rgba($b, .3);
+				cursor: pointer;
+				&.icon-search{
+					display: inline-flex;
+					vertical-align: top;
+				}
+				&.icon-search-tag{
+					position: relative;
+    			z-index: 1;
+					display: inline-flex;
+					vertical-align: top;
+					margin-top: 10px;
+					background: $bg-pr;
+					height: 44px;
+					width: 44px;
+				}
+			}
+			.search-bar{
+				font-family: $sp-r;
+				margin: 10px;
+				margin-top: 0;
+				.search-box{
+					font-size: 18px;
+					height: 40px;
+					width: 316px;
+					padding: 10px;
+					border: none;
+					box-shadow: 0 1px 4px 0 rgba($b, .3);
+					transition: all .2s;
+					&.closed{						
+						width: 0;
+						padding: 0;
+						border: none;
+						box-shadow: none;
+					}
+				}
+			}
+			.react-autosuggest__container{
+				display: inline-block;
+				vertical-align: top;
+				margin-top: 10px;
+				.tag-inp{
+					border: 1px solid $bg-pr;
+					height: 44px;
+					width: 316px;
+				}
+			}
+			.draw-shape{
+				margin: 10px;
+				margin-top: 22px;
+				.ctn-icon{
+					margin-bottom: 8px;
+					.pr{ display: block; }
+					.sc{ display: none; }
+					&:hover{
+						.pr{ display: none; }
+						.sc{ display: block; }
+					}
+				}
+			}
+		}
+	}
+}
+
+// Hiding the map copyright
+// a[href^="http://maps.google.com/maps"]{display:none !important}
+// a[href^="https://maps.google.com/maps"]{display:none !important}
+
+// .gmnoprint a, .gmnoprint span, .gm-style-cc {
+// 	display:none;
+// }
