@@ -6,6 +6,16 @@ body{
   overflow: hidden;
 }
 
+.noselect {
+  -webkit-touch-callout: none; /* iOS Safari */
+    -webkit-user-select: none; /* Safari */
+     -khtml-user-select: none; /* Konqueror HTML */
+       -moz-user-select: none; /* Firefox */
+        -ms-user-select: none; /* Internet Explorer/Edge */
+            user-select: none; /* Non-prefixed version, currently
+                                  supported by Chrome and Opera */
+}
+
 [placeholder]:empty:before {
   content: attr(placeholder);
   display: block;
@@ -16,6 +26,10 @@ body{
 button:focus{
   outline: none !important;
   box-shadow: none !important;
+}
+
+input:focus{
+  outline: none !important;
 }
 
 // ::selection {

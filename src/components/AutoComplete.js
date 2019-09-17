@@ -17,27 +17,20 @@ export default class AutoComplete extends Component {
   
   getSuggestionValue = suggestion => {
     return suggestion.full_name
-    // if(this.props.type === "tag"){
-    // }else if(this.props.type === "sources"){
-    //   return suggestion.name
-    // }
-    // else if(this.props.type === "placeholder"){
-    //   return suggestion.name
-    // }
   }
   
   renderSuggestion = (suggestion, { query }) => {
     let suggestionText = `${suggestion.full_name}`
-    // if(this.props.type === "tag"){
-    // }else if(this.props.type === "sources"){
-    //   suggestionText = `${suggestion.name}`    
-    // }
-    // else if(this.props.type === "placeholder"){
-    //   suggestionText = `${suggestion.name}`    
-    // }
 
     return (
-      <div>{ suggestionText }</div>
+      <div>
+        { 
+          suggestion.image ? 
+          <img className="tag-img" src={suggestion.image} alt="" /> :
+          <img className="tag-img" src="assets/tag-plh.png" alt="" />
+        }        
+        { suggestionText }
+      </div>
     )
   }
 
@@ -48,16 +41,6 @@ export default class AutoComplete extends Component {
       series: true,
     }
 
-    // if(this.props.type === "tag"){
-    //   url = '/api/v1/tags'
-    // }else if(this.props.type === "sources"){
-    //   url = '/api/v1/sources'
-    // }
-    // else if(this.props.type === "placeholder"){
-    //   // url = '/api/v1/reviews/placeholders'
-    //   url = '/api/v1/suggested_tag_for_text'
-    // }
-
     this.http
     .get(url, params, auth)
     .then(res => {
@@ -66,13 +49,6 @@ export default class AutoComplete extends Component {
       l("Total API Results:", currRes)
 
       suggestions = currRes.filter(x => x.full_name.toLowerCase().includes(value.toLowerCase()))      
-      // if(this.props.type === "tag"){
-      // }else if(this.props.type === "sources"){
-      //   suggestions = currRes.filter(x => x.name.toLowerCase().includes(value.toLowerCase()))      
-      // }
-      // else if(this.props.type === "placeholder"){
-      //   suggestions = currRes.filter(x => x.name.toLowerCase().includes(value.toLowerCase()))      
-      // }
       l("Results containing current query:", suggestions)
 
       // To set filtered options 
@@ -81,8 +57,7 @@ export default class AutoComplete extends Component {
       // To set all options 
       this.setState({ suggestions: currRes })
         
-      if(this.props.getCurrSugg)
-        this.props.getCurrSugg(currRes)
+      if(this.props.getCurrSugg) this.props.getCurrSugg(currRes)
     })
     .catch(error => {
       // error callback
@@ -91,9 +66,7 @@ export default class AutoComplete extends Component {
   }
 
   onChange = (event, { newValue }) => {
-    this.setState({
-      value: newValue
-    })
+    this.setState({ value: newValue })
     if (this.props.inputChanged) this.props.inputChanged(newValue)
   }
 
@@ -110,12 +83,20 @@ export default class AutoComplete extends Component {
   }
 
   shouldRenderSuggestions = value => typeof value !== "undefined" && value.trim().length > 0  
+  
+  storeInputReference = autosuggest => {
+    if (autosuggest !== null) this.input = autosuggest.input    
+  }
 
-  toggleSearch = () => this.setState({ showSearch: !this.state.showSearch })
+  toggleSearch = () => {
+    this.setState({ showSearch: !this.state.showSearch }, () => {
+      if (this.state.showSearch) this.input.focus()
+    })
+  }
   
   render() {
     const { value, suggestions } = this.state
-    const inputProps = this.props.inputProps
+    let inputProps = this.props.inputProps
         
     inputProps.value = value
     inputProps.onChange = this.onChange    
@@ -127,13 +108,14 @@ export default class AutoComplete extends Component {
           <img src="assets/search-tag.jpg" alt="" />
         </div>
         <Autosuggest
-          suggestions={suggestions}
           onSuggestionsFetchRequested={this.onSuggestionsFetchRequested}
           onSuggestionsClearRequested={this.onSuggestionsClearRequested}
           onSuggestionSelected={this.onSuggestionSelected}
           getSuggestionValue={this.getSuggestionValue}
           renderSuggestion={this.renderSuggestion}
+          ref={this.storeInputReference}
           highlightFirstSuggestion={false}
+          suggestions={suggestions}
           inputProps={inputProps}
         />
       </>

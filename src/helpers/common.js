@@ -10,5 +10,22 @@ export const rand = length => {
   }
   return randomStr
 }
+export const randBetween = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min
 export const sp = e => e && e.stopPropagation()
 export const pd = e => e && e.preventDefault()
+export const generateColor = () => {
+  const letters = '0123456789ABCDEF'
+  let color = '#'
+  for (let i = 0; i < 6; i++) {
+    color += letters[Math.floor(Math.random() * 16)]
+  }
+  return color
+}
+export const checkDuplicate = (tags, tag) => {
+  return !!tags.filter(t => t.id === tag.id).length
+}
+export const checkActive = tags => {
+  let active = tags.filter(t => t.active)
+  , len = active.length
+  return len ? active : len
+}

@@ -43,6 +43,27 @@
 			&.hidden {
 				margin-left: -1 * $sb-mg;
 			}
+			.tag-row{
+				align-items: center;
+				margin-bottom: 10px;
+				border: 1px solid transparent;
+				cursor: pointer;
+				&:hover, &.active{
+					border-radius: 5px;
+					border: 1px solid $tag-bdr;
+					background-color: $tag-bg;
+				}
+				.tag-color{
+					height: 12px;
+					width: 12px;
+				}
+				.tag-title{
+					font-size: 15px;
+				}
+				.tag-delete{
+					height: 10px;
+				}
+			}
 		}
 		.content {
 			@extend %fhw;
@@ -72,9 +93,10 @@
 			.search-bar{
 				font-family: $sp-r;
 				margin: 10px;
-				margin-top: 0;
+				margin-top: 0;				
+				z-index: 1 !important;
 				.search-box{
-					font-size: 18px;
+					font-size: 17px;
 					height: 40px;
 					width: 316px;
 					padding: 10px;
@@ -92,11 +114,33 @@
 			.react-autosuggest__container{
 				display: inline-block;
 				vertical-align: top;
-				margin-top: 10px;
+				margin-top: 10px;				
 				.tag-inp{
 					border: 1px solid $bg-pr;
 					height: 44px;
 					width: 316px;
+				}
+			}
+			.react-autosuggest__suggestions-container--open{
+				background: $w;
+				width: 360px;
+				position: relative;
+				left: -44px;
+				padding: 10px;
+				border-radius: 2px;
+  			border: solid 1px rgba($b, .05);
+				ul.react-autosuggest__suggestions-list{
+					list-style: none;
+					padding-left: 0;
+					font-size: 15px;
+					margin-bottom: 0;
+					li.react-autosuggest__suggestion{
+						margin-bottom: 10px;
+						cursor: pointer;							
+						img.tag-img{
+							margin-right: 20px;							
+						}
+					}
 				}
 			}
 			.draw-shape{
@@ -111,7 +155,21 @@
 						.sc{ display: block; }
 					}
 				}
+				&.disabled{
+					.ctn-icon{
+						opacity: .8;
+						cursor: not-allowed;
+						&:hover{
+							.pr{ display: block; }
+							.sc{ display: none; }
+						}
+					}
+				}
 			}
+		}
+		img.tag-img{				
+			height: 32px;
+			width: 32px;
 		}
 	}
 }

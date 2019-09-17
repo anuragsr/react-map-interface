@@ -53,6 +53,7 @@ export default class App extends Component {
       .post('/api/v1/login', {
         username: this.state.username,
         password: this.state.password,
+        editor_page: true
       })
       .then(res => {
         l(res)
@@ -71,7 +72,6 @@ export default class App extends Component {
         // l(auth)
 
         this.setState({ isAuth: true })
-
       })
       .catch(err => {
         l(err)
@@ -79,8 +79,6 @@ export default class App extends Component {
         setTimeout(() => {
           this.setState({ showErr: false })
         }, 3000)
-
-        // this.setState({ isAuth: true })      
       })
   }
 

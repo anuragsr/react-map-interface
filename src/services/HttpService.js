@@ -3,8 +3,7 @@ import axios from 'axios'
 const apiHost = 'https://api-admin-staging.oyster.ai'
 let call
 
-export default class HttpService {
-  
+export default class HttpService {  
   get(url, params, auth) {
     let config = {
       method: "get",

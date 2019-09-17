@@ -17,7 +17,7 @@ export default class SearchBox extends Component {
 
   componentDidMount() {
     const {
-      mapsapi: { places },
+      mapsApi: { places },
     } = this.props
     this.searchBox = new places.SearchBox(this.searchInput.current)
     this.searchBox.addListener('places_changed', this.onPlacesChanged)
@@ -25,7 +25,7 @@ export default class SearchBox extends Component {
 
   componentWillUnmount() {
     const {
-      mapsapi: { event },
+      mapsApi: { event },
     } = this.props
     event.clearInstanceListeners(this.searchBox)
   }

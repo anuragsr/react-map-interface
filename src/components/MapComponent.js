@@ -3,31 +3,35 @@
 import React, { Component } from 'react'
 import $ from 'jquery'
 import GoogleMapReact from 'google-map-react'
-import { l, auth } from '../helpers/common'
+import { l, auth, generateColor, checkDuplicate, sp, rand, randBetween } from '../helpers/common'
 
 import SearchBox from './SearchBox'
 import AutoComplete from './AutoComplete'
+import HttpService from '../services/HttpService'
 // const AnyReactComponent = ({ text }) => <div>{text}</div>
-
-// const pos_obj = {
-//   BOTTOM: 11,
-//   BOTTOM_CENTER: 11,
-//   BOTTOM_LEFT: 10,
-//   BOTTOM_RIGHT: 12,
-//   CENTER: 13,
-//   LEFT: 5,
-//   LEFT_BOTTOM: 6,
-//   LEFT_CENTER: 4,
-//   LEFT_TOP: 5,
-//   RIGHT: 7,
-//   RIGHT_BOTTOM: 9,
-//   RIGHT_CENTER: 8,
-//   RIGHT_TOP: 7,
-//   TOP: 2,
-//   TOP_CENTER: 2,
-//   TOP_LEFT: 1,
-//   TOP_RIGHT: 3,
-// }
+let palette = [
+  { color: "#56d86c", tagId: null },
+  { color: "#5f2700", tagId: null },
+  { color: "#294eea", tagId: null },
+  { color: "#ffb478", tagId: null },
+  { color: "#ea5343", tagId: null },
+  { color: "#ffe682", tagId: null },
+  { color: "#dd2c28", tagId: null },
+  { color: "#156bff", tagId: null },
+  { color: "#fc9e2d", tagId: null },
+  { color: "#b36235", tagId: null },
+  { color: "#fb7c2c", tagId: null },
+  { color: "#306f3c", tagId: null },
+  { color: "#ffd200", tagId: null },
+  { color: "#5f274f", tagId: null },
+  { color: "#3bbd63", tagId: null },
+  { color: "#b2388f", tagId: null },
+  { color: "#fbadd9", tagId: null },
+  { color: "#8b250a", tagId: null },
+  { color: "#7e420a", tagId: null },
+  { color: "#3999ff", tagId: null },
+],
+currentTag = null
 
 export default class MapComponent extends Component {
   constructor(props){
@@ -36,26 +40,34 @@ export default class MapComponent extends Component {
     this.savebtn = React.createRef()
     this.searchtags = React.createRef()
     this.drawshapes = React.createRef()
+
+    this.http = new HttpService()
     this.state = {
       name: 'Yul5ia',
       username: 'supervisor@mail.ru',
       mapsApiLoaded: false,
       mapInstance: null,
-      mapsapi: null,
+      mapsApi: null,
+      tags: [],
+      canDraw: false
     }
   }
 
   static defaultProps = {
+    // center: {
+    //   lat: 40.758896,
+    //   lng: -73.985130
+    // },
     center: {
-      lat: 40.730610,
-      lng: -73.935242
+      lat: 40.78343,
+      lng: -73.96625
     },
-    zoom: 12
+    zoom: 14
   }
 
   componentDidMount(){
     $(() => {
-      $('#sidebar-collapse').on('click', function () {
+      $('#sidebar-collapse').on('click', () => {
         $('.sidebar').toggleClass('hidden')
       })
     })
@@ -64,7 +76,6 @@ export default class MapComponent extends Component {
   logout = () => this.props.logout()
   
   apiLoaded = (map, maps) => {
-
     map.controls[maps.ControlPosition.LEFT_TOP].push(this.searchtags.current)
     map.controls[maps.ControlPosition.LEFT_TOP].push(this.drawshapes.current)
     
@@ -72,26 +83,93 @@ export default class MapComponent extends Component {
     map.controls[maps.ControlPosition.RIGHT_TOP].push(this.searchplaces.current)
     map.controls[maps.ControlPosition.RIGHT_BOTTOM].push(this.savebtn.current)
     
-    // map.addListener('click', () => {
-    //   l("Map Clicked")
-    // })
+    maps.event.addListener(map, 'click', () => {
+      l("Map Clicked")
+    })
 
-
-    // let newDiv = document.createElement("div")
-    // newDiv.textContent = "Some Div"
-    // newDiv.index = -1
-    // map.controls[maps.ControlPosition.RIGHT_BOTTOM].push(newDiv)
+    const drawingManager = new maps.drawing.DrawingManager({ map, drawingControl: false })
     
-    // let newDiv2 = document.createElement("div")
-    // newDiv2.textContent = "Some Div 2"
-    // newDiv2.index = -1
-    // map.controls[maps.ControlPosition.RIGHT_BOTTOM].push(newDiv2)
-    // map.controls[maps.ControlPosition.BOTTOM_RIGHT].push(newDiv)
+    maps.event.addListener(drawingManager, 'circlecomplete', shape => {
+      drawingManager.setDrawingMode(null)
+      l(currentTag)
+      // shape.parent = currentTag
 
+      shape.addListener('click', () => {
+        l("Circle clicked", shape)
+        l("Current Tag", currentTag)
+      })
+
+      shape.addListener('radius_changed', () => {
+        l("Circle radius changed", shape)
+        outer.setRadius(shape.getRadius()*1.5)
+        // outer.setRadius(shape.getRadius() + 3)
+      })
+      
+      shape.addListener('center_changed', () => {
+        l("Circle center changed", shape)   
+        outer.setCenter(shape.getCenter())     
+      })
+
+      // Outer shape for circle
+      let outer = new maps.Circle({
+        strokeColor: currentTag.color,
+        strokeOpacity: 0.8,
+        strokeWeight: 2,
+        fillColor: currentTag.color,
+        fillOpacity: 0.35,
+        radius: shape.getRadius() * 1.5,
+        // radius: shape.getRadius() + 3,
+        center: shape.getCenter(),
+        editable: true,
+        suppressUndo: true,
+        // draggable: true,
+        map: map,
+        zIndex: 0
+      })
+
+      outer.addListener('click', () => {
+        l("Outer circle clicked", outer)
+        l("Current Tag", currentTag)
+      })
+      outer.addListener('radius_changed', () => {
+        l("Outer circle radius changed", outer)
+        // outer.setRadius(shape.getRadius() * 1.5)
+        // outer.setRadius(shape.getRadius() + 3)
+      })
+
+      currentTag.shapes.push({
+        id: rand(8),
+        inner: shape,
+        outer: outer,
+        influence: 30,
+      })
+    })
+
+    maps.event.addListener(drawingManager, 'polygoncomplete', shape => {
+      drawingManager.setDrawingMode(null)
+      currentTag.shapes.push(shape)
+      // shape.parent = currentTag
+      
+      maps.event.addListener(shape, 'click', () => {
+        l("Poly clicked", shape)
+      })
+    })
+
+    maps.event.addListener(drawingManager, 'rectanglecomplete', shape => {
+      drawingManager.setDrawingMode(null)
+      currentTag.shapes.push(shape)
+      // shape.parent = currentTag
+      
+      maps.event.addListener(shape, 'click', () => {
+        l("Rect clicked", shape)
+      })
+    })
+    
     this.setState({
       mapsApiLoaded: true,
       mapInstance: map,
-      mapsapi: maps,
+      mapsApi: maps,
+      drawingManager
     })  
   }
 
@@ -145,9 +223,12 @@ export default class MapComponent extends Component {
       // markerOptions: {icon: 'https://developers.google.com/maps/documentation/javascript/examples/full/images/beachflag.png'},
       circleOptions: {
         fillColor: '#00FF00',
-        fillOpacity: 1,
+        fillOpacity: 0.35,
+        // fillOpacity: 1,
         strokeColor: '#00FF00',
-        strokeWeight: 1,
+        strokeOpacity: 0.8,
+        strokeWeight: 2,
+        // strokeWeight: 1,
         // clickable: false,
         editable: true,
         draggable: true,
@@ -156,9 +237,12 @@ export default class MapComponent extends Component {
       },
       polygonOptions: {
         fillColor: '#0000FF',
-        fillOpacity: 1,
+        // fillOpacity: 1,
+        fillOpacity: 0.35,
         strokeColor: '#0000FF',
-        strokeWeight: 1,
+        strokeOpacity: 0.8,
+        strokeWeight: 2,
+        // strokeWeight: 1,
         // clickable: false,
         editable: true,
         draggable: true,
@@ -167,9 +251,12 @@ export default class MapComponent extends Component {
       },
       rectangleOptions: {
         fillColor: '#FF0000',
-        fillOpacity: 1,
+        fillOpacity: 0.35,
+        // fillOpacity: 1,
         strokeColor: '#FF0000',
-        strokeWeight: 1,
+        strokeOpacity: 0.8,
+        strokeWeight: 2,
+        // strokeWeight: 1,
         // clickable: false,
         editable: true,
         draggable: true,
@@ -313,23 +400,180 @@ export default class MapComponent extends Component {
 
   placesChanged = places => this.state.mapInstance.setCenter(places[0].geometry.location)
   
-  tagSelected = tag => {
-    l(tag)
+  chooseColor = tag => {
+    let availColors = palette.filter(c => !c.tagId)
+    , chosenColor
+
+    if (availColors.length){
+      chosenColor = availColors[randBetween(0, availColors.length - 1)]
+      chosenColor.tagId = tag.id
+    } else{
+      chosenColor = {
+        color: generateColor(),
+        tagId: tag.id
+      }
+      palette.push(chosenColor)
+    }
+    return chosenColor.color
   }
-  // new google.maps.LatLng(
-  //   rect.getBounds().getSouthWest().lat() - .005, 
-  //   rect.getBounds().getSouthWest().lng() - .005*2
-  // ),
-  // new google.maps.LatLng(
-  //   rect.getBounds().getNorthEast().lat() + .005, 
-  //   rect.getBounds().getNorthEast().lng() + .005*2
-  // ),
+  
+  tagAdded = tag => {
+    // l(tag)
+    let { tags } = this.state
+    if(checkDuplicate(tags, tag)) return
+    
+    tag.color = this.chooseColor(tag)
+    tag.shapes = []
+    tags.push(tag)
+    this.setState({ tags }, this.tagSelected(tag))
+  }
+  
+  tagDeselected = () => {
+    let { tags } = this.state
+    , canDraw = false
+    
+    currentTag = null
+    
+    tags.forEach(t => {
+      t.active = false
+      t.shapes.forEach(s => s.setMap(null))
+    })
+    this.setState({ tags, canDraw })
+  }
+
+  tagSelected = tag => {
+    this.tagDeselected()
+
+    let { tags, mapInstance, mapsApi, drawingManager } = this.state    
+    , canDraw = true
+    
+    currentTag = tag
+    
+    tags.forEach(t => {
+      if(t.id === tag.id) t.active = true
+      else t.active = false
+    })
+    this.setState({ tags, canDraw }, () => {
+      drawingManager.setOptions({
+        circleOptions: {
+          fillOpacity: 1,
+          fillColor: tag.color,
+          strokeColor: tag.color,
+          strokeOpacity: 1,
+          strokeWeight: 2,
+          editable: true,
+          draggable: true,
+          suppressUndo: true,   
+          zIndex: 1
+        },
+        polygonOptions: {
+          fillOpacity: 1,
+          fillColor: tag.color,
+          strokeColor: tag.color,
+          strokeOpacity: 1,
+          strokeWeight: 2,
+          editable: true,
+          draggable: true,
+          suppressUndo: true,
+          zIndex: 1
+        },
+        rectangleOptions: {
+          fillOpacity: 1, 
+          fillColor: tag.color,
+          strokeColor: tag.color,
+          strokeOpacity: 1,
+          strokeWeight: 2,
+          editable: true,
+          draggable: true,
+          suppressUndo: true,
+          zIndex: 1
+        }
+      })
+    })
+    
+    if(!tag.shapes.length){ // Fetch shapes if new/no shapes
+      const url = '/api/v1/tags-influence'
+      , params = { tags_ids: [tag.id] }
+
+      this.http
+      .get(url, params, auth)
+      .then(res => {
+        let results = res.data.tags
+        , shapes = []
+        tag.shapes = shapes
+        
+        if (results.length){
+          // results.forEach(t => {
+          const areas = results[0].areas
+          areas.length && l(areas)
+          areas.forEach(area => {
+            const coords = area.geometry.coordinates
+            , radius = area.properties.radius
+            shapes.push(
+              new mapsApi.Circle({
+                strokeColor: tag.color,
+                strokeOpacity: 1,
+                strokeWeight: 2,
+                fillColor: tag.color,
+                fillOpacity: 1,
+                map: mapInstance,
+                center: new mapsApi.LatLng(coords[1], coords[0]),
+                // radius: radius*100,
+                radius: radius*1,
+                editable: true,
+                draggable: true,
+                suppressUndo: true,
+              })
+            )
+          })        
+          // })
+        }
+        // this.setState({ tags }, () => {
+        //   // l(tags)
+        // })
+      })
+    } else { // Set shapes again if existing
+      tag.shapes.forEach(s => s.setMap(mapInstance))
+    }
+  }
+  
+  tagDeleted = tag => {
+    let { tags } = this.state
+    
+    // Delete tags
+    tags = tags.filter(t => t.id !== tag.id)
+    this.setState({ tags })
+
+    // Delete drawn shapes
+    tag.shapes.forEach(s => s.setMap(null))
+
+    // Reset palette
+    palette.filter(c => c.tagId === tag.id)[0].tagId = null
+  }
+
+  startDrawing = type => {
+    const { drawingManager, mapsApi } = this.state
+    switch(type){
+      case "polygon": 
+        drawingManager.setDrawingMode(mapsApi.drawing.OverlayType.POLYGON)
+      break;
+      
+      case "circle": 
+        drawingManager.setDrawingMode(mapsApi.drawing.OverlayType.CIRCLE)
+      break;
+
+      default: 
+        drawingManager.setDrawingMode(mapsApi.drawing.OverlayType.RECTANGLE)
+      break;
+    }
+  }
+
   save = () => {
     l("save")
   }
 
   render() {
-    const { mapsApiLoaded, mapInstance, mapsapi } = this.state
+    const { mapsApiLoaded, mapInstance, mapsApi, tags, canDraw } = this.state
     
     return (
       <div className="map-outer">
@@ -354,22 +598,47 @@ export default class MapComponent extends Component {
           </div>
         </nav>
         <div className="wrapper">
-          <nav className="sidebar hidden">
-            <h3>Bootstrap Sidebar</h3>
-          </nav>
-          {/* Important! Always set the container height explicitly */}
-          <div className="content">            
+          {/* <nav className="sidebar hidden" onClick={this.tagDeselected}>{ */}
+          <nav className="sidebar" onClick={this.tagDeselected}>{
+            tags.length > 0 && tags.map((tag, idx) => {
+              return (
+                <div 
+                  key={idx} 
+                  className={`row mx-0 py-2 tag-row ${tag.active ? "active" : ""} `}
+                  onClick={e => { sp(e); this.tagSelected(tag) }}
+                  >
+                  <div className="col-1">
+                    <div 
+                      className="tag-color"
+                      style={{
+                        border: `1px solid ${tag.color}`,
+                        borderRadius: 2,
+                        background: `${tag.color}`
+                      }}
+                    ></div>
+                  </div>
+                  <div className="col-2">{
+                    tag.image ?
+                    <img className="tag-img" src={tag.image} alt="" /> :
+                    <img className="tag-img" src="assets/tag-plh.png" alt="" />
+                  }</div>
+                  <div className="col-7 tag-title p-0">{tag.full_name}</div>
+                  <div className="col-1">
+                    <img 
+                      src="assets/delete-tag-black.svg" 
+                      className="tag-delete" 
+                      onClick={e => { sp(e); this.tagDeleted(tag) }}
+                      alt=""/>
+                  </div>
+                </div>
+              )
+            })
+          }{
+            tags.length === 0 && <h4>No tags selected</h4>
+          }</nav>
+          <div className="content">
             <GoogleMapReact
-              options={{
-                streetViewControl: true,
-                // streetViewControlOptions: {
-                //   position: pos_obj.RIGHT_BOTTOM,
-                // },
-                // zoomControl: true,
-                // zoomControlOptions: {
-                //   position: pos_obj.RIGHT_BOTTOM,
-                // },
-              }}
+              options={{ streetViewControl: true }}
               bootstrapURLKeys={{ 
                 libraries: ['drawing', 'geometry', 'places'],
                 key: 'AIzaSyB977EFLp4w9wVttk6Ne7s1CejK9LQyvsQ' 
@@ -388,40 +657,40 @@ export default class MapComponent extends Component {
                 text="My Marker"
               /> */}                
             </GoogleMapReact>
-            <div className="search-bar" ref={this.searchplaces}>
-              { mapsApiLoaded && 
-                <SearchBox 
-                  map={mapInstance} 
-                  mapsapi={mapsapi} 
-                  onPlacesChanged={this.placesChanged} 
-                /> }
-            </div>
+            <div className="search-bar" ref={this.searchplaces}>{ 
+              mapsApiLoaded && 
+              <SearchBox 
+                map={mapInstance} 
+                mapsApi={mapsApi} 
+                onPlacesChanged={this.placesChanged} 
+              />
+            }</div>
             <div className="search-bar" ref={this.searchtags}>
               <AutoComplete
                 inputProps={{
                   placeholder: 'Search for tags ...',
                 }}
-                optionSelected={this.tagSelected}
+                optionSelected={this.tagAdded}
                 // type="tag"
                 // inputChanged={this.handleAutoInput}
                 // getCurrSugg={this.handleSuggestions}
               />
             </div>
-            <div className="draw-shape" ref={this.drawshapes}>
-              <div className="ctn-icon">
+            <div className={`draw-shape ${canDraw ? "" : "disabled"}`} ref={this.drawshapes}>
+              <div className="ctn-icon" onClick={() => this.startDrawing("polygon")}>
                 <img className="pr" src="assets/edit-grey.svg" alt="" />
                 <img className="sc" src="assets/edit-active.svg" alt="" />
               </div>
-              <div className="ctn-icon">
+              <div className="ctn-icon" onClick={() => this.startDrawing("circle")}>
                 <img className="pr" src="assets/circle-grey.svg" alt="" />
                 <img className="sc" src="assets/circle-active.svg" alt="" />
               </div>
-              <div className="ctn-icon">
+              <div className="ctn-icon" onClick={() => this.startDrawing("rectangle")}>
                 <img className="pr" src="assets/square-grey.svg" alt="" />
                 <img className="sc" src="assets/square-active.svg" alt="" />
               </div>
             </div>
-            <button className="btn-accent" onClick={this.save}ref={this.savebtn}>
+            <button className="btn-accent" onClick={this.save} ref={this.savebtn}>
               Save
             </button>
           </div>
