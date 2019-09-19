@@ -167,6 +167,21 @@
 				}
 			}
 		}
+		.ctn-influence{
+			@extend %j-c;
+			min-width: 75px;
+			background-color: $inf-bg;
+			font-size: 17px;
+			border-radius: 15px;			
+			padding: 10px;
+			color: $w;
+			font-family: $sp-r;
+			text-align: center;
+			img{
+				cursor: pointer;
+				margin-left: 10px;	
+			}
+		}
 		img.tag-img{				
 			height: 32px;
 			width: 32px;

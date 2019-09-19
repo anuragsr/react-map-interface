@@ -3,12 +3,21 @@
 import React, { Component } from 'react'
 import $ from 'jquery'
 import GoogleMapReact from 'google-map-react'
-import { l, auth, generateColor, checkDuplicate, sp, rand, randBetween } from '../helpers/common'
+import { l, auth, generateColor, checkDuplicate, sp, rand, randBetween, findGroupById } from '../helpers/common'
 
 import SearchBox from './SearchBox'
 import AutoComplete from './AutoComplete'
 import HttpService from '../services/HttpService'
-// const AnyReactComponent = ({ text }) => <div>{text}</div>
+
+const InfluenceBox = ({ text }) => {
+  return (
+    <div className="ctn-influence">
+      {text}
+      <img onClick={() => alert('clearInfluence')} src="assets/clear.svg" alt=""/>
+    </div>
+  )
+}
+
 let palette = [
   { color: "#56d86c", tagId: null },
   { color: "#5f2700", tagId: null },
@@ -30,8 +39,9 @@ let palette = [
   { color: "#8b250a", tagId: null },
   { color: "#7e420a", tagId: null },
   { color: "#3999ff", tagId: null },
-],
-currentTag = null
+]
+// , currentTag = null
+// , currentShape = null
 
 export default class MapComponent extends Component {
   constructor(props){
@@ -48,6 +58,7 @@ export default class MapComponent extends Component {
       mapsApiLoaded: false,
       mapInstance: null,
       mapsApi: null,
+      currentTag: null,
       tags: [],
       canDraw: false
     }
@@ -76,6 +87,7 @@ export default class MapComponent extends Component {
   logout = () => this.props.logout()
   
   apiLoaded = (map, maps) => {
+    let { tags } = this.state
     map.controls[maps.ControlPosition.LEFT_TOP].push(this.searchtags.current)
     map.controls[maps.ControlPosition.LEFT_TOP].push(this.drawshapes.current)
     
@@ -83,86 +95,110 @@ export default class MapComponent extends Component {
     map.controls[maps.ControlPosition.RIGHT_TOP].push(this.searchplaces.current)
     map.controls[maps.ControlPosition.RIGHT_BOTTOM].push(this.savebtn.current)
     
-    maps.event.addListener(map, 'click', () => {
-      l("Map Clicked")
-    })
+    maps.Rectangle.prototype.getCenter =  function() {
+      let bounds = this.getBounds()
+      return new maps.LatLng(
+        (bounds.getSouthWest().lat() + bounds.getNorthEast().lat()) / 2,
+        (bounds.getSouthWest().lng() + bounds.getNorthEast().lng()) / 2,
+      )
+    }
+    maps.Rectangle.prototype.getTopRight = function () {
+      // let bounds = this.getBounds()
+      // return new maps.LatLng(
+      //   (bounds.getSouthWest().lat() + bounds.getNorthEast().lat()) / 2,
+      //   (bounds.getSouthWest().lng() + bounds.getNorthEast().lng()) / 2,
+      // )
+    }
 
-    const drawingManager = new maps.drawing.DrawingManager({ map, drawingControl: false })
+    maps.Polygon.prototype.getCenter = function () {
+      let arr = this.getPath().getArray()
+      , distX = 0, distY = 0
+      , len = arr.length
+
+      arr.forEach(element => {
+        distX += element.lat()
+        distY += element.lng()
+      })
+
+      return new maps.LatLng(distX / len, distY / len)
+    }
+    maps.Polygon.prototype.getBounds = function () {
+      let bounds = new maps.LatLngBounds()
+      this.getPath().forEach(element => bounds.extend(element))
+      return bounds
+    }
+    maps.Polygon.prototype.getTopRight = function () {
+      // let arr = this.getPath().getArray()
+      //   , distX = 0, distY = 0
+      //   , len = arr.length
+
+      // arr.forEach(element => {
+      //   distX += element.lat()
+      //   distY += element.lng()
+      // })
+
+      // return new maps.LatLng(distX / len, distY / len)
+    }
     
-    maps.event.addListener(drawingManager, 'circlecomplete', shape => {
-      drawingManager.setDrawingMode(null)
-      l(currentTag)
-      // shape.parent = currentTag
+    maps.Circle.prototype.getTopRight = function () {
+      // let arr = this.getPath().getArray()
+      //   , distX = 0, distY = 0
+      //   , len = arr.length
 
-      shape.addListener('click', () => {
-        l("Circle clicked", shape)
-        l("Current Tag", currentTag)
-      })
+      // arr.forEach(element => {
+      //   distX += element.lat()
+      //   distY += element.lng()
+      // })
 
-      shape.addListener('radius_changed', () => {
-        l("Circle radius changed", shape)
-        outer.setRadius(shape.getRadius()*1.5)
-        // outer.setRadius(shape.getRadius() + 3)
-      })
-      
-      shape.addListener('center_changed', () => {
-        l("Circle center changed", shape)   
-        outer.setCenter(shape.getCenter())     
-      })
+      // return new maps.LatLng(distX / len, distY / len)
+    }
 
-      // Outer shape for circle
-      let outer = new maps.Circle({
-        strokeColor: currentTag.color,
-        strokeOpacity: 0.8,
-        strokeWeight: 2,
-        fillColor: currentTag.color,
-        fillOpacity: 0.35,
-        radius: shape.getRadius() * 1.5,
-        // radius: shape.getRadius() + 3,
-        center: shape.getCenter(),
-        editable: true,
-        suppressUndo: true,
-        // draggable: true,
-        map: map,
-        zIndex: 0
-      })
-
-      outer.addListener('click', () => {
-        l("Outer circle clicked", outer)
-        l("Current Tag", currentTag)
-      })
-      outer.addListener('radius_changed', () => {
-        l("Outer circle radius changed", outer)
-        // outer.setRadius(shape.getRadius() * 1.5)
-        // outer.setRadius(shape.getRadius() + 3)
-      })
-
-      currentTag.shapes.push({
-        id: rand(8),
-        inner: shape,
-        outer: outer,
-        influence: 30,
-      })
+    maps.event.addListener(map, "click", () => {
+      let { currentTag } = this.state      
+      currentTag.shapes.forEach(s => s.selected = false)
+      this.setState({ currentTag })
     })
 
-    maps.event.addListener(drawingManager, 'polygoncomplete', shape => {
-      drawingManager.setDrawingMode(null)
-      currentTag.shapes.push(shape)
-      // shape.parent = currentTag
-      
-      maps.event.addListener(shape, 'click', () => {
-        l("Poly clicked", shape)
-      })
+    maps.event.addDomListener(document, "keyup", e => {
+      if(e.target.tagName !== "INPUT"){
+        const key = e.keyCode ? e.keyCode : e.which
+        let { currentTag } = this.state      
+        // l(key)        
+        switch (key) {
+          case 8:
+            let selected = currentTag.shapes.filter(s => s.selected)
+            if(selected.length){
+              // Remove current shape from map
+              selected[0].shape.setMap(null)
+              selected[0].outer.setMap(null) 
+              
+              // Remove current shape from tag
+              currentTag.shapes = currentTag.shapes.filter(s => s.shapeId !== selected[0].shapeId)
+              
+              // API request to delete shape: TODO
+
+              this.setState({ currentTag })
+            } else{              
+              this.tagDeleted(currentTag)
+            }
+          break;
+  
+          default: break;
+        }
+      }
+    })
+    
+    const drawingManager = new maps.drawing.DrawingManager({ map, drawingControl: false })
+    maps.event.addListener(drawingManager, "polygoncomplete", shape => {
+      this.addEventHandlers(shape, "polygon", "draw")
+    })
+    
+    maps.event.addListener(drawingManager, "circlecomplete", shape => {
+      this.addEventHandlers(shape, "circle", "draw")
     })
 
-    maps.event.addListener(drawingManager, 'rectanglecomplete', shape => {
-      drawingManager.setDrawingMode(null)
-      currentTag.shapes.push(shape)
-      // shape.parent = currentTag
-      
-      maps.event.addListener(shape, 'click', () => {
-        l("Rect clicked", shape)
-      })
+    maps.event.addListener(drawingManager, "rectanglecomplete", shape => {
+      this.addEventHandlers(shape, "rectangle", "draw")
     })
     
     this.setState({
@@ -172,230 +208,175 @@ export default class MapComponent extends Component {
       drawingManager
     })  
   }
+  
+  shapeSelected = shape => {
+    let { currentTag } = this.state
+    , currentShape = findGroupById(currentTag.shapes, shape.shapeId)
 
-  handleGoogleMapApi = google => {
-    const map = google.map
-    google.maps.Polygon.prototype.getBounds = function () {
-      var bounds = new google.maps.LatLngBounds()
-      this.getPath().forEach(function (element, index) { bounds.extend(element) })
-      return bounds
-    }
-    google.maps.Polygon.prototype.getCenter = function () {
-      var arr = this.getPath().getArray()
-      , distX = 0, distY = 0
-      , len = arr.length
+    currentTag.shapes.forEach(s => s.selected = false)
+    currentShape.selected = true
+    this.setState({ currentTag })
+  }
 
-      arr.forEach(function (element, index) { 
-        distX+= element.lat()
-        distY+= element.lng()
-      })
-      
-      return new google.maps.LatLng(distX/len, distY/len)
-    }
-    google.maps.Rectangle.prototype.getCenter = function () {
-      var bounds = this.getBounds()
-//       , distX = 0, distY = 0
-//       , len = arr.length
-// 
-//       arr.forEach(function (element, index) { 
-//         distX+= element.lat()
-//         distY+= element.lng()
-//       })
-      
-      return new google.maps.LatLng(
-        (bounds.getSouthWest().lat() + bounds.getNorthEast().lat()) /2, 
-        (bounds.getSouthWest().lng() + bounds.getNorthEast().lng()) /2, 
-      )
-    }
-    const drawingManager = new google.maps.drawing.DrawingManager({
-      // drawingMode: google.maps.drawing.OverlayType.MARKER,
-      drawingControl: true,
-      drawingControlOptions: {
-        position: google.maps.ControlPosition.TOP_CENTER,
-        drawingModes: [
-          google.maps.drawing.OverlayType.CIRCLE,
-          google.maps.drawing.OverlayType.POLYGON,
-          google.maps.drawing.OverlayType.RECTANGLE
-          // google.maps.drawing.OverlayType.MARKER,
-          // google.maps.drawing.OverlayType.POLYLINE,
-        ]
-      },
-      // markerOptions: {icon: 'https://developers.google.com/maps/documentation/javascript/examples/full/images/beachflag.png'},
-      circleOptions: {
-        fillColor: '#00FF00',
-        fillOpacity: 0.35,
-        // fillOpacity: 1,
-        strokeColor: '#00FF00',
-        strokeOpacity: 0.8,
-        strokeWeight: 2,
-        // strokeWeight: 1,
-        // clickable: false,
-        editable: true,
-        draggable: true,
-        suppressUndo: true,
-        zIndex: 1
-      },
-      polygonOptions: {
-        fillColor: '#0000FF',
-        // fillOpacity: 1,
-        fillOpacity: 0.35,
-        strokeColor: '#0000FF',
-        strokeOpacity: 0.8,
-        strokeWeight: 2,
-        // strokeWeight: 1,
-        // clickable: false,
-        editable: true,
-        draggable: true,
-        suppressUndo: true,
-        zIndex: 1
-      },
-      rectangleOptions: {
-        fillColor: '#FF0000',
-        fillOpacity: 0.35,
-        // fillOpacity: 1,
-        strokeColor: '#FF0000',
-        strokeOpacity: 0.8,
-        strokeWeight: 2,
-        // strokeWeight: 1,
-        // clickable: false,
-        editable: true,
-        draggable: true,
-        suppressUndo: true,
-        zIndex: 1
-      }
-    })
-    drawingManager.setMap(map)
+  addEventHandlers = (shape, type, method) => {    
+    let { mapsApi, mapInstance, currentTag, drawingManager } = this.state
+    , shapeId = rand(8), outer, start
+    
+    drawingManager.setDrawingMode(null)
+    shape.shapeId = shapeId
+    shape.addListener("click", () => this.shapeSelected(shape))
+    shape.addListener("drag", () => this.shapeSelected(shape))
 
-    google.maps.event.addListener(drawingManager, 'circlecomplete', function(circle) {
-      drawingManager.setDrawingMode(null)
-      console.log(circle)
-      let temp2 = new google.maps.Circle({ 
-        strokeColor: '#00FF00',
-        strokeOpacity: 0.8,
-        strokeWeight: 2,
-        fillColor: '#00FF00',
-        fillOpacity: 0.35,
-        radius: circle.getRadius()*1.5, 
-        center: circle.getCenter(),
-        editable: true,
-        suppressUndo: true,
-        draggable: true,
-        map: map
-      })
-
-      circle.addListener('radius_changed', function() {
-        // console.log("radius", circle)
-        // console.log("radius", circle.getRadius())
-        // let nr = circle.getRadius()*2
-        // console.log("new radius", nr)
-        temp2.setRadius(circle.getRadius()*1.5)
-      })
-
-      circle.addListener('center_changed', function() {
-        // console.log("center", circle.getBounds())
-        temp2.setCenter(circle.getCenter())
-      })
-    })
-
-    google.maps.event.addListener(drawingManager, 'polygoncomplete', function(poly) {
-      drawingManager.setDrawingMode(null)
-      console.log(poly)
-      let start = poly.getCenter()
-      , opoints = poly.getPath().getArray()
-      , nArr = []
-
-      opoints.forEach(pt => {
-        let np = google.maps.geometry.spherical.interpolate(start, pt, 1.5)
-        nArr.push(np)
-      })
-
-      let nPoly = new google.maps.Polygon({
-        strokeColor: '#0000FF',
-        strokeOpacity: 0.8,
-        strokeWeight: 2,
-        fillColor: '#0000FF',
-        fillOpacity: 0.35,
-        map: map,
-        editable: true,
-        suppressUndo: true,
-        draggable: true,
-        path: nArr
-      })
-      console.log(nPoly)
-
-      poly.getPath().addListener('insert_at', function() {        
-        console.log('Vertex added.')
-        let start = poly.getCenter()
-        , opoints = poly.getPath().getArray()
-        , nArr = []
-
-        opoints.forEach(pt => {
-          let np = google.maps.geometry.spherical.interpolate(start, pt, 1.5)
-          nArr.push(np)
+    switch(type){
+      case "polygon":
+        let shape_points = shape.getPath().getArray()
+        , outer_points = []
+        
+        start = shape.getCenter()
+        shape_points.forEach(pt => {
+          let np = mapsApi.geometry.spherical.interpolate(start, pt, 1.5)
+          outer_points.push(np)
         })
 
-        nPoly.setPath(nArr)
-      })
-
-      poly.getPath().addListener('set_at', function() {
-        console.log('Vertex moved')
-        let start = poly.getCenter()
-        , opoints = poly.getPath().getArray()
-        , nArr = []
-
-        opoints.forEach(pt => {
-          let np = google.maps.geometry.spherical.interpolate(start, pt, 1.5)
-          nArr.push(np)
-        })
-
-        nPoly.setPath(nArr)
-      })
-
-    })
-
-    google.maps.event.addListener(drawingManager, 'rectanglecomplete', function(rect) {
-      drawingManager.setDrawingMode(null)
-      console.log(rect)
-      let rectangle = new google.maps.Rectangle({
-          strokeColor: '#FF0000',
+        outer = new mapsApi.Polygon({
+          strokeColor: currentTag.color,
           strokeOpacity: 0.8,
           strokeWeight: 2,
-          fillColor: '#FF0000',
+          fillColor: currentTag.color,
           fillOpacity: 0.35,
-          map: map,
+          map: mapInstance,
           editable: true,
-          draggable: true,
+          suppressUndo: true,
+          // draggable: true,
+          path: outer_points,
+          zIndex: 0
+        })
+
+        shape.getPath().addListener('insert_at', () => {
+          // l('Vertex added.')
+          let start = shape.getCenter()
+          , shape_points = shape.getPath().getArray()
+          , outer_points = []
+
+          shape_points.forEach(pt => {
+            let np = mapsApi.geometry.spherical.interpolate(start, pt, 1.5)
+            outer_points.push(np)
+          })
+
+          outer.setPath(outer_points)
+          this.shapeSelected(shape)
+        })
+
+        shape.getPath().addListener('set_at', () => {
+          // l('Vertex moved')
+          let start = shape.getCenter()
+          , shape_points = shape.getPath().getArray()
+          , outer_points = []
+
+          shape_points.forEach(pt => {
+            let np = mapsApi.geometry.spherical.interpolate(start, pt, 1.5)
+            outer_points.push(np)
+          })
+
+          outer.setPath(outer_points)
+          this.shapeSelected(shape)
+        })
+      break;
+
+      case "circle":
+        shape.addListener("radius_changed", () => {
+          outer.setRadius(shape.getRadius() * 1.5)
+          // outer.setRadius(shape.getRadius() + 3)
+          this.shapeSelected(shape)
+        })
+
+        shape.addListener("center_changed", () => {
+          outer.setCenter(shape.getCenter())
+        })
+
+        // Outer shape for circle
+        outer = new mapsApi.Circle({
+          strokeColor: currentTag.color,
+          strokeOpacity: 0.8,
+          strokeWeight: 2,
+          fillColor: currentTag.color,
+          fillOpacity: 0.35,
+          radius: shape.getRadius() * 1.5,
+          // radius: shape.getRadius() + 3,
+          center: shape.getCenter(),
+          editable: true,
+          suppressUndo: true,
+          // draggable: true,
+          map: mapInstance,
+          zIndex: 0
+        })
+
+        outer.addListener("radius_changed", () => {
+          // Change influence according to new radius
+          
+          this.shapeSelected(shape)          
+        })
+
+      break;
+      
+      default:
+        shape.addListener("bounds_changed", () => {
+          let start = shape.getCenter()
+          , bounds = shape.getBounds()
+            
+          outer.setBounds(
+            new mapsApi.LatLngBounds(
+              mapsApi.geometry.spherical.interpolate(start, bounds.getSouthWest(), 1.5),
+              mapsApi.geometry.spherical.interpolate(start, bounds.getNorthEast(), 1.5),
+            )
+          )
+
+          this.shapeSelected(shape)
+        })
+
+        outer = new mapsApi.Rectangle({
+          strokeColor: currentTag.color,
+          strokeOpacity: 0.8,
+          strokeWeight: 2,
+          fillColor: currentTag.color,
+          fillOpacity: 0.35,
+          map: mapInstance,
+          editable: true,
+          // draggable: true,
           suppressUndo: true
         })
-      , start = rect.getCenter()
-      , bounds = rect.getBounds()
 
-      rectangle.setBounds(
-        // rect.getBounds()
-        new google.maps.LatLngBounds(
-          google.maps.geometry.spherical.interpolate(start, bounds.getSouthWest(), 1.5),
-          google.maps.geometry.spherical.interpolate(start, bounds.getNorthEast(), 1.5),
-        )
-      )
+        start = shape.getCenter()
+        let bounds = shape.getBounds()
 
-      // rectangle.addListener('bounds_changed', function(e){
-      //   console.log(e)
-      //   console.log(rectangle.getBounds())
-      // })
-
-      rect.addListener('bounds_changed', function(e){
-        var start = rect.getCenter()
-        , bounds = rect.getBounds()
-
-        rectangle.setBounds(
-          // rect.getBounds()
-          new google.maps.LatLngBounds(
-            google.maps.geometry.spherical.interpolate(start, bounds.getSouthWest(), 1.5),
-            google.maps.geometry.spherical.interpolate(start, bounds.getNorthEast(), 1.5),
+        outer.setBounds(
+          new mapsApi.LatLngBounds(
+            mapsApi.geometry.spherical.interpolate(start, bounds.getSouthWest(), 1.5),
+            mapsApi.geometry.spherical.interpolate(start, bounds.getNorthEast(), 1.5),
           )
         )
-      })
+
+        outer.addListener("bounds_changed", () => {
+          // Change influence and keep bounds in check here
+
+          this.shapeSelected(shape)
+        })
+
+      break;
+    }
+
+    outer.shapeId = shapeId
+    outer.addListener("click", () => this.shapeSelected(outer))
+
+    currentTag.shapes.forEach(s => s.selected = false)
+    currentTag.shapes.push({
+      shapeId,
+      shape: shape,
+      outer: outer,
+      influence: 30,
+      selected: method === "fetch" ? false : true
     })
+    this.setState({ currentTag })
   }
 
   placesChanged = places => this.state.mapInstance.setCenter(places[0].geometry.location)
@@ -416,7 +397,24 @@ export default class MapComponent extends Component {
     }
     return chosenColor.color
   }
-  
+
+  startDrawing = type => {
+    const { drawingManager, mapsApi } = this.state
+    switch (type) {
+      case "polygon":
+        drawingManager.setDrawingMode(mapsApi.drawing.OverlayType.POLYGON)
+        break;
+
+      case "circle":
+        drawingManager.setDrawingMode(mapsApi.drawing.OverlayType.CIRCLE)
+        break;
+
+      default:
+        drawingManager.setDrawingMode(mapsApi.drawing.OverlayType.RECTANGLE)
+        break;
+    }
+  }
+
   tagAdded = tag => {
     // l(tag)
     let { tags } = this.state
@@ -432,13 +430,15 @@ export default class MapComponent extends Component {
     let { tags } = this.state
     , canDraw = false
     
-    currentTag = null
-    
     tags.forEach(t => {
       t.active = false
-      t.shapes.forEach(s => s.setMap(null))
+      t.shapes.forEach(s => {
+        s.selected = false
+        s.shape.setMap(null)
+        s.outer.setMap(null)
+      })
     })
-    this.setState({ tags, canDraw })
+    this.setState({ currentTag: null, tags, canDraw })
   }
 
   tagSelected = tag => {
@@ -446,126 +446,116 @@ export default class MapComponent extends Component {
 
     let { tags, mapInstance, mapsApi, drawingManager } = this.state    
     , canDraw = true
-    
-    currentTag = tag
-    
+    , shapeProps = {
+      strokeColor: tag.color,
+      strokeOpacity: 1,
+      strokeWeight: 2,
+      fillColor: tag.color,
+      fillOpacity: 1,
+      editable: true,
+      suppressUndo: true,
+      draggable: true,
+      zIndex: 1,
+    }
+
+    drawingManager.setOptions({
+      circleOptions: { ...shapeProps },
+      polygonOptions: { ...shapeProps },
+      rectangleOptions: { ...shapeProps },
+    })
+
     tags.forEach(t => {
       if(t.id === tag.id) t.active = true
       else t.active = false
     })
-    this.setState({ tags, canDraw }, () => {
-      drawingManager.setOptions({
-        circleOptions: {
-          fillOpacity: 1,
-          fillColor: tag.color,
-          strokeColor: tag.color,
-          strokeOpacity: 1,
-          strokeWeight: 2,
-          editable: true,
-          draggable: true,
-          suppressUndo: true,   
-          zIndex: 1
-        },
-        polygonOptions: {
-          fillOpacity: 1,
-          fillColor: tag.color,
-          strokeColor: tag.color,
-          strokeOpacity: 1,
-          strokeWeight: 2,
-          editable: true,
-          draggable: true,
-          suppressUndo: true,
-          zIndex: 1
-        },
-        rectangleOptions: {
-          fillOpacity: 1, 
-          fillColor: tag.color,
-          strokeColor: tag.color,
-          strokeOpacity: 1,
-          strokeWeight: 2,
-          editable: true,
-          draggable: true,
-          suppressUndo: true,
-          zIndex: 1
-        }
-      })
-    })
-    
-    if(!tag.shapes.length){ // Fetch shapes if new/no shapes
-      const url = '/api/v1/tags-influence'
-      , params = { tags_ids: [tag.id] }
 
-      this.http
-      .get(url, params, auth)
-      .then(res => {
-        let results = res.data.tags
-        , shapes = []
-        tag.shapes = shapes
-        
-        if (results.length){
-          // results.forEach(t => {
-          const areas = results[0].areas
-          areas.length && l(areas)
-          areas.forEach(area => {
-            const coords = area.geometry.coordinates
-            , radius = area.properties.radius
-            shapes.push(
-              new mapsApi.Circle({
-                strokeColor: tag.color,
-                strokeOpacity: 1,
-                strokeWeight: 2,
-                fillColor: tag.color,
-                fillOpacity: 1,
-                map: mapInstance,
-                center: new mapsApi.LatLng(coords[1], coords[0]),
-                // radius: radius*100,
-                radius: radius*1,
-                editable: true,
-                draggable: true,
-                suppressUndo: true,
-              })
-            )
-          })        
-          // })
-        }
-        // this.setState({ tags }, () => {
-        //   // l(tags)
-        // })
-      })
-    } else { // Set shapes again if existing
-      tag.shapes.forEach(s => s.setMap(mapInstance))
-    }
+    this.setState({ currentTag: tag, tags, canDraw }, () => {
+
+      if(!tag.shapes.length){ // Fetch shapes if new/no shapes
+        const url = '/api/v1/tags-influence'
+        , params = { tags_ids: [tag.id] }      
+  
+        this.http
+        .get(url, params, auth)
+        .then(res => {
+          let results = res.data.tags
+          , shapes = []
+          tag.shapes = shapes
+          
+          if (results.length){
+            // results.forEach(t => {
+            const areas = results[0].areas
+            areas.length && l(areas)
+            areas.forEach(area => {
+              let coords = area.geometry.coordinates, shape
+              , bounds = new mapsApi.LatLngBounds()
+  
+              switch(area.properties.type){
+                case "polygon": 
+                  shape = new mapsApi.Polygon({
+                    ...shapeProps,
+                    map: mapInstance,
+                    path: coords[0].map(p => new mapsApi.LatLng(p[1], p[0])),
+                  })
+  
+                break;
+                
+                case "circle": 
+                  shape = new mapsApi.Circle({
+                    ...shapeProps,
+                    map: mapInstance,
+                    center: new mapsApi.LatLng(coords[1], coords[0]),
+                    // radius: radius*100,
+                    radius: area.properties.radius * 1,
+                  })
+      
+                break;
+                
+                default: 
+                  coords[0].forEach(p => bounds.extend(new mapsApi.LatLng(p[1], p[0])))
+  
+                  shape = new mapsApi.Rectangle({
+                    ...shapeProps,
+                    map: mapInstance,
+                    bounds
+                  })
+  
+                break;
+              }
+  
+              this.addEventHandlers(shape, area.properties.type, "fetch")
+            })
+            // })
+  
+          }
+        })
+      } else { // Set shapes again if existing
+        tag.shapes.forEach(s => {
+          s.shape.setMap(mapInstance)
+          s.outer.setMap(mapInstance)
+        })
+      }
+
+    })    
   }
   
   tagDeleted = tag => {
     let { tags } = this.state
-    
+    , canDraw = false
+
     // Delete tags
     tags = tags.filter(t => t.id !== tag.id)
-    this.setState({ tags })
+    this.setState({ tags, canDraw, currentTag: null })
 
     // Delete drawn shapes
-    tag.shapes.forEach(s => s.setMap(null))
+    // currentTag = null
+    tag.shapes.forEach(s => {
+      s.shape.setMap(null)
+      s.outer.setMap(null)
+    })
 
     // Reset palette
     palette.filter(c => c.tagId === tag.id)[0].tagId = null
-  }
-
-  startDrawing = type => {
-    const { drawingManager, mapsApi } = this.state
-    switch(type){
-      case "polygon": 
-        drawingManager.setDrawingMode(mapsApi.drawing.OverlayType.POLYGON)
-      break;
-      
-      case "circle": 
-        drawingManager.setDrawingMode(mapsApi.drawing.OverlayType.CIRCLE)
-      break;
-
-      default: 
-        drawingManager.setDrawingMode(mapsApi.drawing.OverlayType.RECTANGLE)
-      break;
-    }
   }
 
   save = () => {
@@ -573,8 +563,7 @@ export default class MapComponent extends Component {
   }
 
   render() {
-    const { mapsApiLoaded, mapInstance, mapsApi, tags, canDraw } = this.state
-    
+    const { mapsApiLoaded, mapInstance, mapsApi, currentTag, tags, canDraw } = this.state
     return (
       <div className="map-outer">
         <nav className="navbar navbar-expand-lg navbar-dark">
@@ -633,7 +622,7 @@ export default class MapComponent extends Component {
                 </div>
               )
             })
-          }{
+            }{
             tags.length === 0 && <h4>No tags selected</h4>
           }</nav>
           <div className="content">
@@ -646,17 +635,23 @@ export default class MapComponent extends Component {
               defaultCenter={this.props.center}
               defaultZoom={this.props.zoom}
               yesIWantToUseGoogleMapApiInternals
-              // onGoogleApiLoaded={ this.handleGoogleMapApi }
               onGoogleApiLoaded={({ map, maps }) => {
                 this.apiLoaded(map, maps)
               }}
             >
-              {/* <AnyReactComponent
-                lat={59.955413}
-                lng={30.337844}
-                text="My Marker"
-              /> */}                
+              { currentTag && currentTag.shapes.map((s, idx) => {
+                  return (
+                    s.selected ? <InfluenceBox
+                      key={idx}
+                      lat={s.shape.getCenter().lat()}
+                      lng={s.shape.getCenter().lng()}
+                      text={`${s.influence}m`}
+                    /> : null
+                  )
+                })
+              }
             </GoogleMapReact>
+            
             <div className="search-bar" ref={this.searchplaces}>{ 
               mapsApiLoaded && 
               <SearchBox 

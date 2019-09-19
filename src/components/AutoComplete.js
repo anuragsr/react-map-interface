@@ -65,7 +65,7 @@ export default class AutoComplete extends Component {
     })
   }
 
-  onChange = (event, { newValue }) => {
+  onChange = (event, { newValue }) => {    
     this.setState({ value: newValue })
     if (this.props.inputChanged) this.props.inputChanged(newValue)
   }
