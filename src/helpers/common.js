@@ -29,7 +29,7 @@ export const checkActive = tags => {
   , len = active.length
   return len ? active : len
 }
-export const findGroupById = (shapes, id) => {
+export const findShapeGroupById = (shapes, id) => {
   let result = shapes.filter(t => t.shapeId === id)
   , len = result.length
   return len ? result[0] : len

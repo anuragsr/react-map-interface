@@ -169,7 +169,9 @@
 		}
 		.ctn-influence{
 			@extend %j-c;
-			min-width: 75px;
+			display: inline-flex;
+			// min-width: 85px;
+			// width: 85px;
 			background-color: $inf-bg;
 			font-size: 17px;
 			border-radius: 15px;			
@@ -177,6 +179,10 @@
 			color: $w;
 			font-family: $sp-r;
 			text-align: center;
+			position: relative;
+			top: -10px;
+			left: 10px;
+			white-space: nowrap;
 			img{
 				cursor: pointer;
 				margin-left: 10px;	
