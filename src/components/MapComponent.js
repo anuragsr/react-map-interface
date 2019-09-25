@@ -98,7 +98,8 @@ export default class MapComponent extends Component {
       lat: 40.78343,
       lng: -73.96625
     },
-    zoom: 20,
+    zoom: 15,
+    // zoom: 20,
     influence: 3
   }
 
@@ -186,12 +187,9 @@ export default class MapComponent extends Component {
                 this.setState({ currentTag }, () => {
                   // Add to delete array for deletion
                   if (selected[0].id){
-                    deleteArray.push({
-                      tagId: currentTag.id,
-                      id: selected[0].id,
-                    })
+                    deleteArray.push({ tagId: currentTag.id, id: selected[0].id })
                     updateArray = updateArray.filter(t => t.id !== selected[0].id)
-                    l(deleteArray)
+                    // l(deleteArray)
                   }
                 })
               } else{              
@@ -207,17 +205,9 @@ export default class MapComponent extends Component {
     
     // Adding drawing options
     const drawingManager = new maps.drawing.DrawingManager({ map, drawingControl: false })
-    maps.event.addListener(drawingManager, "polygoncomplete", shape => {
-      this.addEventHandlers(shape, "polygon", "draw")
-    })
-    
-    maps.event.addListener(drawingManager, "circlecomplete", shape => {
-      this.addEventHandlers(shape, "circle", "draw")
-    })
-
-    maps.event.addListener(drawingManager, "rectanglecomplete", shape => {
-      this.addEventHandlers(shape, "rectangle", "draw")
-    })
+    maps.event.addListener(drawingManager, "polygoncomplete", shape => this.addEventHandlers(shape, "polygon", "draw"))
+    maps.event.addListener(drawingManager, "circlecomplete", shape => this.addEventHandlers(shape, "circle", "draw"))
+    maps.event.addListener(drawingManager, "rectanglecomplete", shape => this.addEventHandlers(shape, "rectangle", "draw"))
     
     this.setState({
       mapsApiLoaded: true,
@@ -238,19 +228,19 @@ export default class MapComponent extends Component {
 
   addEventHandlers = (shape, type, method, id) => {
     let { mapsApi, mapInstance, currentTag, drawingManager } = this.state
-    , shapeId = rand(8), outer
+    , sph = mapsApi.geometry.spherical
+    , shapeId = rand(8)
     , rectEventType = null
     , polyEventType = null
-    , sph = mapsApi.geometry.spherical
+    , outer
     
     drawingManager.setDrawingMode(null)
     shape.shapeId = shapeId
-    shape.addListener("click", () => {l("Clicked"); this.shapeSelected(shape)})
+    shape.addListener("click", () => this.shapeSelected(shape))
     shape.addListener("drag", () => this.shapeSelected(shape))
 
     switch(type){
       case "polygon":
-        
         // let np = sph.interpolate(start, pt, 1.008)
         outer = new mapsApi.Polygon({
           strokeColor: currentTag.color,
@@ -291,11 +281,8 @@ export default class MapComponent extends Component {
           currentShape.selected = true
           this.setState({ currentTag }, () => {
             if (currentShape.id && !checkDuplicate(updateArray, { id: currentShape.id })) {
-              updateArray.push({
-                tagId: currentTag.id,
-                id: currentShape.id
-              })
-              l(updateArray)
+              updateArray.push({ tagId: currentTag.id, id: currentShape.id })
+              // l(updateArray)
             }
           })
         }
@@ -357,11 +344,8 @@ export default class MapComponent extends Component {
         const setNewShape = currentShape => {
           this.setState({ currentTag }, () => {
             if (currentShape.id && !checkDuplicate(updateArray, { id: currentShape.id })) {
-              updateArray.push({
-                tagId: currentTag.id,
-                id: currentShape.id
-              })
-              l(updateArray)
+              updateArray.push({ tagId: currentTag.id, id: currentShape.id })
+              // l(updateArray)
             }
           })  
         }
@@ -557,11 +541,8 @@ export default class MapComponent extends Component {
           }
 
           if (currentShape.id && !checkDuplicate(updateArray, { id: currentShape.id })) {
-            updateArray.push({
-              tagId: currentTag.id,
-              id: currentShape.id
-            })
-            l(updateArray)
+            updateArray.push({ tagId: currentTag.id, id: currentShape.id })
+            // l(updateArray)
           }
 
           currentShape.outer.setBounds(new mapsApi.LatLngBounds(
@@ -593,13 +574,11 @@ export default class MapComponent extends Component {
       influence: this.props.influence,
       selected: method === "fetch" ? false : true
     })
+
     this.setState({ currentTag }, () => {
       if (method === "draw"){
-        createArray.push({
-          tagId: currentTag.id,
-          shapeId,
-        })
-        l(createArray)
+        createArray.push({ tagId: currentTag.id, shapeId })
+        // l(createArray)
       }
     })
   }
