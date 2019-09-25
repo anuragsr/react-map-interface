@@ -21,16 +21,3 @@ export const generateColor = () => {
   }
   return color
 }
-export const checkDuplicate = (tags, tag) => {
-  return !!tags.filter(t => t.id === tag.id).length
-}
-export const checkActive = tags => {
-  let active = tags.filter(t => t.active)
-  , len = active.length
-  return len ? active : len
-}
-export const findShapeGroupById = (shapes, id) => {
-  let result = shapes.filter(t => t.shapeId === id)
-  , len = result.length
-  return len ? result[0] : len
-}

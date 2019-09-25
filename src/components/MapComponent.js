@@ -3,7 +3,7 @@
 import React, { Component } from 'react'
 import $ from 'jquery'
 import GoogleMapReact from 'google-map-react'
-import { l, auth, generateColor, checkDuplicate, sp, rand, randBetween, findShapeGroupById } from '../helpers/common'
+import { l, auth, generateColor, sp, rand, randBetween } from '../helpers/common'
 
 import SearchBox from './SearchBox'
 import AutoComplete from './AutoComplete'
@@ -16,6 +16,34 @@ const InfluenceBox = ({ text, onClearInfluence }) => {
       {/* <img onClick={onClearInfluence} src="assets/clear.svg" alt=""/> */}
     </div>
   )
+}
+
+const checkDuplicate = (items, item) => {
+  return !!items.filter(t => t.id === item.id).length
+}
+, findShapeGroupById = (shapes, id) => {
+  let result = shapes.filter(t => t.shapeId === id)
+    , len = result.length
+  return len ? result[0] : len
+}
+, radians = n => n * (Math.PI / 180)
+, degrees = n => n * (180 / Math.PI)
+, getBearing = (start, end) => {
+  let startLat = radians(start.lat())
+  , startLong = radians(start.lng())
+  , endLat = radians(end.lat())
+  , endLong = radians(end.lng())
+  , dLong = endLong - startLong
+  , dPhi = Math.log(Math.tan(endLat / 2.0 + Math.PI / 4.0) / Math.tan(startLat / 2.0 + Math.PI / 4.0))
+  
+  if (Math.abs(dLong) > Math.PI) {
+    if (dLong > 0.0)
+      dLong = -(2.0 * Math.PI - dLong)
+    else
+      dLong = (2.0 * Math.PI + dLong)
+  }
+
+  return (degrees(Math.atan2(dLong, dPhi)) + 360.0) % 360.0
 }
 
 let palette = [
@@ -40,6 +68,9 @@ let palette = [
   { color: "#7e420a", tagId: null },
   { color: "#3999ff", tagId: null },
 ]
+, createArray = []
+, updateArray = []
+, deleteArray = []
 
 export default class MapComponent extends Component {
   constructor(props){
@@ -67,7 +98,7 @@ export default class MapComponent extends Component {
       lat: 40.78343,
       lng: -73.96625
     },
-    zoom: 15,
+    zoom: 20,
     influence: 3
   }
 
@@ -92,11 +123,6 @@ export default class MapComponent extends Component {
     
     // Adding methods to google maps namespace object prototypes
     maps.Rectangle.prototype.getCenter =  function() {
-      // let bounds = this.getBounds()
-      // return new maps.LatLng(
-      //   (bounds.getSouthWest().lat() + bounds.getNorthEast().lat()) / 2,
-      //   (bounds.getSouthWest().lng() + bounds.getNorthEast().lng()) / 2,
-      // )
       return this.getBounds().getCenter()
     }
     maps.Rectangle.prototype.getTopRight = function () {
@@ -156,10 +182,18 @@ export default class MapComponent extends Component {
                 
                 // Remove current shape from tag
                 currentTag.shapes = currentTag.shapes.filter(s => s.shapeId !== selected[0].shapeId)
-                
-                // API request to delete shape: TODO
-  
-                this.setState({ currentTag })
+
+                this.setState({ currentTag }, () => {
+                  // Add to delete array for deletion
+                  if (selected[0].id){
+                    deleteArray.push({
+                      tagId: currentTag.id,
+                      id: selected[0].id,
+                    })
+                    updateArray = updateArray.filter(t => t.id !== selected[0].id)
+                    l(deleteArray)
+                  }
+                })
               } else{              
                 this.tagDeleted(currentTag)
               }
@@ -202,26 +236,22 @@ export default class MapComponent extends Component {
     this.setState({ currentTag })
   }
 
-  addEventHandlers = (shape, type, method) => {    
+  addEventHandlers = (shape, type, method, id) => {
     let { mapsApi, mapInstance, currentTag, drawingManager } = this.state
-    , shapeId = rand(8), outer, rectEventType = null
+    , shapeId = rand(8), outer
+    , rectEventType = null
+    , polyEventType = null
+    , sph = mapsApi.geometry.spherical
     
     drawingManager.setDrawingMode(null)
     shape.shapeId = shapeId
-    shape.addListener("click", () => this.shapeSelected(shape))
+    shape.addListener("click", () => {l("Clicked"); this.shapeSelected(shape)})
     shape.addListener("drag", () => this.shapeSelected(shape))
 
     switch(type){
       case "polygon":
-        let shape_points = shape.getPath().getArray()
-        , outer_points = []
-        , start = shape.getCenter()
         
-        shape_points.forEach(pt => {
-          let np = mapsApi.geometry.spherical.interpolate(start, pt, 1.008)
-          outer_points.push(np)
-        })
-
+        // let np = sph.interpolate(start, pt, 1.008)
         outer = new mapsApi.Polygon({
           strokeColor: currentTag.color,
           strokeOpacity: 0.8,
@@ -231,57 +261,121 @@ export default class MapComponent extends Component {
           map: mapInstance,
           editable: true,
           suppressUndo: true,
-          // draggable: true,
-          path: outer_points,
+          // clickable: true,
+          // draggable: false,
           zIndex: 0
         })
 
-        shape.getPath().addListener('insert_at', () => {
-          // l('Vertex added.')
-          let  shape_points = shape.getPath().getArray()
-          , outer_points = []
-          , start = shape.getCenter()
+        const setNewPath = currentShape => {
+          if (polyEventType === "fromSelf_inner"){
+            currentShape.outer.getPath().clear()
+            currentShape.outer.setMap(null)
+          }
+          currentShape.outer.setPath(currentShape.shape.getPath().getArray().map(pt => 
+            sph.computeOffset(pt, currentShape.influence, getBearing(currentShape.shape.getCenter(), pt)))
+          )
 
-          shape_points.forEach(pt => {
-            let np = mapsApi.geometry.spherical.interpolate(start, pt, 1.008)
-            outer_points.push(np)
+          if (polyEventType === "fromSelf_inner"){
+            setTimeout(() => {
+              currentShape.outer.setMap(mapInstance)
+              mapsApi.event.trigger(currentShape.outer, "click", {})
+            }, 10)
+            // currentShape.outer.setMap(mapInstance)
+            polyEventType = null
+          }
+          
+          currentShape.outer.getPath().addListener("set_at", polyOuterListener)
+          currentShape.outer.getPath().addListener("insert_at", polyOuterListener)
+
+          currentTag.shapes.forEach(s => s.selected = false)
+          currentShape.selected = true
+          this.setState({ currentTag }, () => {
+            if (currentShape.id && !checkDuplicate(updateArray, { id: currentShape.id })) {
+              updateArray.push({
+                tagId: currentTag.id,
+                id: currentShape.id
+              })
+              l(updateArray)
+            }
+          })
+        }
+        , polyOuterListener = () => {
+          // l('PolyEventType', polyEventType)
+          let currentShape = findShapeGroupById(currentTag.shapes, outer.shapeId)
+          , result = true
+
+          if (polyEventType === "fromSelf_inner"){     
+            this.setState({ currentTag })
+            return
+          }
+          polyEventType = null
+
+          // l('Outer vertex moved', currentShape)
+          currentShape.outer.getPath().getArray().forEach(v => {
+            result = result && !mapsApi.geometry.poly.containsLocation(v, currentShape.shape)
           })
 
-          outer.setPath(outer_points)
-          this.shapeSelected(shape)
+          if (result) { // No outer point inside inner shape
+            let max = 0
+            currentShape.shape.getPath().getArray().forEach((v, idx) => {
+              max = Math.max(max, Math.round(
+                sph.computeDistanceBetween(v, outer.getPath().getArray()[idx]) / Math.sqrt(2)
+              ))
+            })
+            currentShape.influence = max
+            currentTag.shapes.forEach(s => s.selected = false)
+            currentShape.selected = true
+            this.setState({ currentTag })
+          } else { // Atleast one outer point inside inner shape, reset to original influence
+            currentShape.influence = this.props.influence
+            polyEventType = "fromSelf_inner"
+            setNewPath(currentShape)
+          }
+        }
+        , path = shape.getPath()
+
+        path.addListener("insert_at", () => {
+          let currentShape = findShapeGroupById(currentTag.shapes, shape.shapeId)
+          // l('Vertex added', currentShape)
+          polyEventType = "vertexAdded"
+          setNewPath(currentShape)
         })
 
-        shape.getPath().addListener('set_at', () => {
-          // l('Vertex moved')
-          let shape_points = shape.getPath().getArray()
-          , outer_points = []
-          , start = shape.getCenter()
-           
-          shape_points.forEach(pt => {
-            let np = mapsApi.geometry.spherical.interpolate(start, pt, 1.008)
-            outer_points.push(np)
-          })
-
-          outer.setPath(outer_points)
-          this.shapeSelected(shape)
+        path.addListener("set_at", () => {
+          let currentShape = findShapeGroupById(currentTag.shapes, shape.shapeId)
+          // l('Vertex moved', currentShape)
+          polyEventType = "vertexChanged"
+          setNewPath(currentShape)
         })
+        
+        outer.setPath(path.getArray().map(pt => sph.computeOffset(pt, this.props.influence, getBearing(shape.getCenter(), pt))))
+        outer.getPath().addListener("set_at", polyOuterListener)
+        outer.getPath().addListener("insert_at", polyOuterListener)
       break;
 
       case "circle":
-        shape.addListener("radius_changed", () => {
-          let { currentTag } = this.state
-          , currentShape = findShapeGroupById(currentTag.shapes, shape.shapeId)
+        const setNewShape = currentShape => {
+          this.setState({ currentTag }, () => {
+            if (currentShape.id && !checkDuplicate(updateArray, { id: currentShape.id })) {
+              updateArray.push({
+                tagId: currentTag.id,
+                id: currentShape.id
+              })
+              l(updateArray)
+            }
+          })  
+        }
 
+        shape.addListener("radius_changed", () => {
+          let currentShape = findShapeGroupById(currentTag.shapes, shape.shapeId)
           currentShape.outer.setRadius(currentShape.shape.getRadius() + currentShape.influence)
-          this.setState({ currentTag })
+          setNewShape(currentShape)
         })
 
         shape.addListener("center_changed", () => {
-          let { currentTag } = this.state
-          , currentShape = findShapeGroupById(currentTag.shapes, shape.shapeId)
-
+          let currentShape = findShapeGroupById(currentTag.shapes, shape.shapeId)
           currentShape.outer.setCenter(currentShape.shape.getCenter())
-          this.setState({ currentTag })
+          setNewShape(currentShape)
         })
 
         // Outer shape for circle
@@ -303,8 +397,7 @@ export default class MapComponent extends Component {
 
         outer.addListener("radius_changed", () => {
           // Change influence according to new radius
-          let { currentTag } = this.state
-          , currentShape = findShapeGroupById(currentTag.shapes, outer.shapeId)
+          let currentShape = findShapeGroupById(currentTag.shapes, outer.shapeId)
           
           currentTag.shapes.forEach(s => s.selected = false)
           currentShape.selected = true
@@ -314,34 +407,22 @@ export default class MapComponent extends Component {
             currentShape.influence = this.props.influence
             currentShape.outer.setRadius(currentShape.shape.getRadius() + currentShape.influence)
           }
-          this.setState({ currentTag })  
+          setNewShape(currentShape)
         })
 
       break;
       
       default:
         shape.addListener("bounds_changed", () => {
-          // if (rectEventType === "fromInner"){
-          //   rectEventType = null
-          // } else{
-          //   rectEventType = "fromInner"
-            
-          // }
-          let { currentTag } = this.state
-          , currentShape = findShapeGroupById(currentTag.shapes, shape.shapeId)
-          , bounds = currentShape.shape.getBounds()
-          , ne = bounds.getNorthEast()
-          , sw = bounds.getSouthWest()
+          let currentShape = findShapeGroupById(currentTag.shapes, shape.shapeId)
 
-          currentTag.shapes.forEach(s => s.selected = false)
-          currentShape.selected = true
-          currentShape.outer.setBounds(
+          rectEventType = "from_inner"
+          currentShape.outer.setBounds(            
             new mapsApi.LatLngBounds(
-              mapsApi.geometry.spherical.computeOffset(sw, currentShape.influence * Math.sqrt(2), 225),
-              mapsApi.geometry.spherical.computeOffset(ne, currentShape.influence * Math.sqrt(2), 45),
+              sph.computeOffset(currentShape.shape.getBounds().getSouthWest(), currentShape.influence * Math.sqrt(2), 225),
+              sph.computeOffset(currentShape.shape.getBounds().getNorthEast(), currentShape.influence * Math.sqrt(2), 45),
             )
           )
-          this.setState({ currentTag })
         })
 
         outer = new mapsApi.Rectangle({
@@ -352,122 +433,175 @@ export default class MapComponent extends Component {
           fillOpacity: 0.35,
           map: mapInstance,
           editable: true,
-          clickable: true,
           // draggable: true,
           suppressUndo: true
-        })
-        
-        let bounds = shape.getBounds()
-        , ne = bounds.getNorthEast()
-        , sw = bounds.getSouthWest()
-        
-        outer.area = 0
-        outer.setBounds(new mapsApi.LatLngBounds(
-          mapsApi.geometry.spherical.computeOffset(sw, this.props.influence * Math.sqrt(2), 225),
-          mapsApi.geometry.spherical.computeOffset(ne, this.props.influence * Math.sqrt(2), 45),
-        ))
-        
+        })        
+
         outer.addListener("bounds_changed", () => {
-          // if (!rectEventType) rectEventType = "fromSelf"
+          let currentShape
+          , vertices_inner
+          , innerBounds
+          , inner_ne
+          , inner_sw
+          , vertices_outer
+          , all_vertices_outer
+          , outerBounds
+          , outer_ne
+          , outer_sw
+          , result = true
 
           // l("Changed outer", rectEventType)
-          // if(rectEventType === "fromInner"){
+          if (rectEventType !== "init"){ 
+            currentShape = findShapeGroupById(currentTag.shapes, shape.shapeId)
+            currentTag.shapes.forEach(s => s.selected = false)
+            currentShape.selected = true
+          }
 
-          //   rectEventType = null
-          // // } else if(rectEventType === "fromSelf"){
-          // } else {
-          //   rectEventType = "fromInner"
+          switch(rectEventType){
+            case "init": // Set area first time and return
+              outer_ne = outer.getBounds().getNorthEast()
+              outer_sw = outer.getBounds().getSouthWest()
+              vertices_outer = [ // Starting from ne
+                new mapsApi.LatLng(outer_ne.lat(), outer_ne.lng()),
+                new mapsApi.LatLng(outer_sw.lat(), outer_ne.lng()),
+                new mapsApi.LatLng(outer_sw.lat(), outer_sw.lng()),
+                new mapsApi.LatLng(outer_ne.lat(), outer_sw.lng()),
+              ] 
 
-          // }  
+              outer.area = sph.computeArea(vertices_outer)
+              rectEventType = null
+            return;
+            
+            case "fromSelf_inner": // Some points inside
+            case "fromSelf_drag": // Dragging
+              outer_ne = currentShape.outer.getBounds().getNorthEast()
+              outer_sw = currentShape.outer.getBounds().getSouthWest()
+              vertices_outer = [ // Starting from ne
+                new mapsApi.LatLng(outer_ne.lat(), outer_ne.lng()),
+                new mapsApi.LatLng(outer_sw.lat(), outer_ne.lng()),
+                new mapsApi.LatLng(outer_sw.lat(), outer_sw.lng()),
+                new mapsApi.LatLng(outer_ne.lat(), outer_sw.lng()),
+              ]
 
+              currentShape.outer.area = sph.computeArea(vertices_outer)
+              rectEventType = null
+              this.setState({ currentTag })
+            return;
+
+            default: // fromInner
+              rectEventType = null
+              this.setState({ currentTag })
+            break;
+          }
+          
           // Change influence and keep bounds in check here
-          let { currentTag } = this.state
-          , currentShape = findShapeGroupById(currentTag.shapes, shape.shapeId)
-          , innerBounds = currentShape.shape.getBounds()
-          , inner_ne = innerBounds.getNorthEast()
-          , inner_sw = innerBounds.getSouthWest()
-          , outerBounds = currentShape.outer.getBounds()
-          , outer_ne = outerBounds.getNorthEast()
-          , outer_sw = outerBounds.getSouthWest()
+          innerBounds = currentShape.shape.getBounds()
+          inner_ne = innerBounds.getNorthEast()
+          inner_sw = innerBounds.getSouthWest()
+          
+          outerBounds = currentShape.outer.getBounds()
+          outer_ne = outerBounds.getNorthEast()
+          outer_sw = outerBounds.getSouthWest()
 
-          currentTag.shapes.forEach(s => s.selected = false)
-          currentShape.selected = true
-
-          let vertices_inner = [ // Starting from ne
+          vertices_inner = [ // Starting from ne
             new mapsApi.LatLng(inner_ne.lat(), inner_ne.lng()),
             new mapsApi.LatLng(inner_sw.lat(), inner_ne.lng()),
             new mapsApi.LatLng(inner_sw.lat(), inner_sw.lng()),
             new mapsApi.LatLng(inner_ne.lat(), inner_sw.lng()),
           ] 
-          , vertices_outer = [ // Starting from ne
+          
+          vertices_outer = [ // Starting from ne
             new mapsApi.LatLng(outer_ne.lat(), outer_ne.lng()),
             new mapsApi.LatLng(outer_sw.lat(), outer_ne.lng()),
             new mapsApi.LatLng(outer_sw.lat(), outer_sw.lng()),
             new mapsApi.LatLng(outer_ne.lat(), outer_sw.lng()),
           ] 
-          , max = 0
-          , min = Infinity
-
-          let new_area = mapsApi.geometry.spherical.computeArea(vertices_outer)
-          , old_area = currentShape.outer.area
           
-          // l(new_area, old_area)
+          all_vertices_outer = [ // For the side points as well
+            ...vertices_outer,
+            new mapsApi.LatLng((outer_ne.lat() + outer_sw.lat())/2, outer_ne.lng()),
+            new mapsApi.LatLng(outer_sw.lat(), (outer_ne.lng() + outer_sw.lng())/2),
+            new mapsApi.LatLng((outer_sw.lat() + outer_ne.lat())/2, outer_sw.lng()),
+            new mapsApi.LatLng(outer_ne.lat(), (outer_sw.lng() + outer_ne.lng())/2),
+          ] 
 
-          if (rectEventType === "fromSelf") {
-            rectEventType = null
-            return
-          }
-
-          let result = true
-          vertices_outer.forEach((v, idx) => {
+          all_vertices_outer.forEach(v => {
             result = result && !currentShape.shape.getBounds().contains(v)
           })
-
+          
           if(result){ // No outer point inside inner shape
-            if (new_area < old_area){
+            let new_area = sph.computeArea(vertices_outer)
+            , old_area = currentShape.outer.area
+            // l(new_area, old_area)
+            if (new_area < old_area){ // Is the new shape smaller? Then set influence as smallest vertex distance
+              let min = Infinity
               vertices_inner.forEach((v, idx) => {
                 min = Math.min(min, Math.round(
-                  mapsApi.geometry.spherical.computeDistanceBetween(v, vertices_outer[idx]) / Math.sqrt(2)
+                  sph.computeDistanceBetween(v, vertices_outer[idx]) / Math.sqrt(2)
                 ))
               })
               currentShape.influence = min
-            } else {
+            } else { // Is the new shape bigger? Then set influence as largest vertex distance
+              let max = 0
               vertices_inner.forEach((v, idx) => {
                 max = Math.max(max, Math.round(
-                  mapsApi.geometry.spherical.computeDistanceBetween(v, vertices_outer[idx]) / Math.sqrt(2)
+                  sph.computeDistanceBetween(v, vertices_outer[idx]) / Math.sqrt(2)
                 ))
               })
               currentShape.influence = max
             }
-            rectEventType = "fromSelf"
-            currentShape.outer.area = new_area
+            rectEventType = "fromSelf_drag"            
           } else { // Atleast one outer point inside inner shape, reset to original influence
             currentShape.influence = this.props.influence
-            rectEventType = "fromSelf"
+            rectEventType = "fromSelf_inner"
           }
+
+          if (currentShape.id && !checkDuplicate(updateArray, { id: currentShape.id })) {
+            updateArray.push({
+              tagId: currentTag.id,
+              id: currentShape.id
+            })
+            l(updateArray)
+          }
+
           currentShape.outer.setBounds(new mapsApi.LatLngBounds(
-            mapsApi.geometry.spherical.computeOffset(inner_sw, currentShape.influence * Math.sqrt(2), 225),
-            mapsApi.geometry.spherical.computeOffset(inner_ne, currentShape.influence * Math.sqrt(2), 45),
+            sph.computeOffset(inner_sw, currentShape.influence * Math.sqrt(2), 225),
+            sph.computeOffset(inner_ne, currentShape.influence * Math.sqrt(2), 45),
           ))
-          this.setState({ currentTag })
+
         })
 
+        rectEventType = "init"
+        outer.setBounds(new mapsApi.LatLngBounds(
+          sph.computeOffset(shape.getBounds().getSouthWest(), this.props.influence * Math.sqrt(2), 225),
+          sph.computeOffset(shape.getBounds().getNorthEast(), this.props.influence * Math.sqrt(2), 45),
+        ))
       break;
     }
 
     outer.shapeId = shapeId
     outer.addListener("click", () => this.shapeSelected(outer))
+    // outer.addListener("click", e => { l(e); this.shapeSelected(outer) })
 
     currentTag.shapes.forEach(s => s.selected = false)
     currentTag.shapes.push({
-      shapeId,
+      id: method === "fetch" ? id : null, // For API operations
+      shapeId, // For drawing operations
       type,
       shape: shape,
       outer: outer,
       influence: this.props.influence,
       selected: method === "fetch" ? false : true
     })
-    this.setState({ currentTag })
+    this.setState({ currentTag }, () => {
+      if (method === "draw"){
+        createArray.push({
+          tagId: currentTag.id,
+          shapeId,
+        })
+        l(createArray)
+      }
+    })
   }
 
   placesChanged = places => this.state.mapInstance.setCenter(places[0].geometry.location)
@@ -608,10 +742,9 @@ export default class MapComponent extends Component {
                 break;
               }
   
-              this.addEventHandlers(shape, area.properties.type, "fetch")
+              this.addEventHandlers(shape, area.properties.type, "fetch", area.id)
             })
             // })
-  
           }
         })
       } else { // Set shapes again if existing
@@ -646,11 +779,11 @@ export default class MapComponent extends Component {
   clearInfluence = shape => {
     l(shape)
   }
-  _onChildClick = arg => {
-    l(arg)
-  }
+
   save = () => {
-    l("save")
+    l("createArray", createArray)
+    l("updateArray", updateArray)
+    l("deleteArray", deleteArray)
   }
 
   render() {
@@ -678,8 +811,8 @@ export default class MapComponent extends Component {
           </div>
         </nav>
         <div className="wrapper">
-          {/* <nav className="sidebar hidden" onClick={this.tagDeselected}>{ */}
-          <nav className="sidebar" onClick={this.tagDeselected}>{
+          {/* <div className="sidebar hidden" onClick={this.tagDeselected}>{ */}
+          <div className="sidebar" onClick={this.tagDeselected}>{
             tags.length > 0 && tags.map((tag, idx) => {
               return (
                 <div 
@@ -715,7 +848,7 @@ export default class MapComponent extends Component {
             })
             }{
             tags.length === 0 && <h4>No tags selected</h4>
-          }</nav>
+          }</div>
           <div className="content">
             <GoogleMapReact
               options={{ streetViewControl: true }}
