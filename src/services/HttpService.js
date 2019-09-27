@@ -14,6 +14,17 @@ export default class HttpService {
 
     return this.doRequest(config)
   }
+
+  delete(url, params, auth) {
+    let config = {
+      method: "delete",
+      url: apiHost + url,
+      params,
+      auth
+    }
+
+    return this.doRequest(config)
+  }
   
   post(url, data, auth, onUploadProgress) {
     let config = {

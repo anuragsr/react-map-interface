@@ -9,11 +9,17 @@ import SearchBox from './SearchBox'
 import AutoComplete from './AutoComplete'
 import HttpService from '../services/HttpService'
 
-const InfluenceBox = ({ text, onClearInfluence }) => {
+const InfluenceBox = ({ text, onClearInfluence, undo, undoTime, undoNotAllowed, onUndo }) => {
   return (
     <div className="ctn-influence">
-      {text}
-      {/* <img onClick={onClearInfluence} src="assets/clear.svg" alt=""/> */}
+      {undo && <>
+        <a href="javascript:void(0)" onClick={onUndo}>Undo</a>
+        &nbsp;&nbsp;{undoTime}
+      </>}
+      {!undo && <>
+        {text}
+        {!undoNotAllowed && <img onClick={onClearInfluence} src="assets/clear.svg" alt=""/>}
+      </>}
     </div>
   )
 }
@@ -190,30 +196,32 @@ export default class MapComponent extends Component {
                     deleteArray.push({ tagId: currentTag.id, id: selected[0].id })
                     updateArray = updateArray.filter(t => t.id !== selected[0].id)
                     // l(deleteArray)
+                  } else{
+                    createArray = createArray.filter(t => t.id !== selected[0].id)
                   }
                 })
               } else{              
                 this.tagDeleted(currentTag)
               }
-            break;
+            break
     
-            default: break;
+            default: break
           }
         }
       }
     })
     
     // Adding drawing options
-    const drawingManager = new maps.drawing.DrawingManager({ map, drawingControl: false })
-    maps.event.addListener(drawingManager, "polygoncomplete", shape => this.addEventHandlers(shape, "polygon", "draw"))
-    maps.event.addListener(drawingManager, "circlecomplete", shape => this.addEventHandlers(shape, "circle", "draw"))
-    maps.event.addListener(drawingManager, "rectanglecomplete", shape => this.addEventHandlers(shape, "rectangle", "draw"))
+    const dm = new maps.drawing.DrawingManager({ map, drawingControl: false })
+    maps.event.addListener(dm, "polygoncomplete", shape => this.addEventHandlers(shape, "polygon", "draw"))
+    maps.event.addListener(dm, "circlecomplete", shape => this.addEventHandlers(shape, "circle", "draw"))
+    maps.event.addListener(dm, "rectanglecomplete", shape => this.addEventHandlers(shape, "rectangle", "draw"))
     
     this.setState({
       mapsApiLoaded: true,
       mapInstance: map,
       mapsApi: maps,
-      drawingManager
+      drawingManager: dm
     })  
   }
   
@@ -226,13 +234,14 @@ export default class MapComponent extends Component {
     this.setState({ currentTag })
   }
 
-  addEventHandlers = (shape, type, method, id) => {
+  addEventHandlers = (shape, type, method, area) => {
     let { mapsApi, mapInstance, currentTag, drawingManager } = this.state
     , sph = mapsApi.geometry.spherical
     , shapeId = rand(8)
     , rectEventType = null
     , polyEventType = null
     , outer
+    , shapeObj = {}
     
     drawingManager.setDrawingMode(null)
     shape.shapeId = shapeId
@@ -241,6 +250,11 @@ export default class MapComponent extends Component {
 
     switch(type){
       case "polygon":
+        // if (method === "draw"){
+        // } else {
+        //   // Here the correct coords must be used for outer shape
+        // }
+
         // let np = sph.interpolate(start, pt, 1.008)
         outer = new mapsApi.Polygon({
           strokeColor: currentTag.color,
@@ -338,7 +352,7 @@ export default class MapComponent extends Component {
         outer.setPath(path.getArray().map(pt => sph.computeOffset(pt, this.props.influence, getBearing(shape.getCenter(), pt))))
         outer.getPath().addListener("set_at", polyOuterListener)
         outer.getPath().addListener("insert_at", polyOuterListener)
-      break;
+      break
 
       case "circle":
         const setNewShape = currentShape => {
@@ -361,7 +375,12 @@ export default class MapComponent extends Component {
           currentShape.outer.setCenter(currentShape.shape.getCenter())
           setNewShape(currentShape)
         })
-
+        
+        // if (method === "draw"){
+        // } else {
+        //   // Here the correct coords must be used for outer shape
+        // }
+        
         // Outer shape for circle
         outer = new mapsApi.Circle({
           strokeColor: currentTag.color,
@@ -394,7 +413,7 @@ export default class MapComponent extends Component {
           setNewShape(currentShape)
         })
 
-      break;
+      break
       
       default:
         shape.addListener("bounds_changed", () => {
@@ -475,7 +494,7 @@ export default class MapComponent extends Component {
             default: // fromInner
               rectEventType = null
               this.setState({ currentTag })
-            break;
+            break
           }
           
           // Change influence and keep bounds in check here
@@ -557,7 +576,11 @@ export default class MapComponent extends Component {
           sph.computeOffset(shape.getBounds().getSouthWest(), this.props.influence * Math.sqrt(2), 225),
           sph.computeOffset(shape.getBounds().getNorthEast(), this.props.influence * Math.sqrt(2), 45),
         ))
-      break;
+        // if (method === "draw"){
+        // } else {
+        //   // Here the correct coords must be used for outer shape
+        // }
+      break
     }
 
     outer.shapeId = shapeId
@@ -565,22 +588,34 @@ export default class MapComponent extends Component {
     // outer.addListener("click", e => { l(e); this.shapeSelected(outer) })
 
     currentTag.shapes.forEach(s => s.selected = false)
-    currentTag.shapes.push({
-      id: method === "fetch" ? id : null, // For API operations
+    shapeObj = {
       shapeId, // For drawing operations
       type,
-      shape: shape,
-      outer: outer,
-      influence: this.props.influence,
-      selected: method === "fetch" ? false : true
-    })
-
-    this.setState({ currentTag }, () => {
-      if (method === "draw"){
-        createArray.push({ tagId: currentTag.id, shapeId })
-        // l(createArray)
+      shape,
+      outer,
+      getInfPos: function () {
+        if (!this.undo && !this.undoNotAllowed) return this.outer.getTopRight()
+        return this.shape.getTopRight()
       }
-    })
+    }
+    if (method === "draw") {
+      shapeObj.id = null // For API operations
+      shapeObj.influence = this.props.influence
+      shapeObj.selected = true
+      createArray.push({ tagId: currentTag.id, shapeId })
+    } else{
+      shapeObj.id = area.id // For API operations
+      shapeObj.influence = this.calculateInfluence(area)
+      shapeObj.selected = false
+    }
+    currentTag.shapes.push(shapeObj)
+    this.setState({ currentTag })
+  }
+
+  calculateInfluence = area => {
+    l(area)
+    // Here the correct coords must be used for calculating influence
+    return 30
   }
 
   placesChanged = places => this.state.mapInstance.setCenter(places[0].geometry.location)
@@ -607,15 +642,15 @@ export default class MapComponent extends Component {
     switch (type) {
       case "polygon":
         drawingManager.setDrawingMode(mapsApi.drawing.OverlayType.POLYGON)
-        break;
+        break
 
       case "circle":
         drawingManager.setDrawingMode(mapsApi.drawing.OverlayType.CIRCLE)
-        break;
+        break
 
       default:
         drawingManager.setDrawingMode(mapsApi.drawing.OverlayType.RECTANGLE)
-        break;
+        break
     }
   }
 
@@ -699,7 +734,7 @@ export default class MapComponent extends Component {
                     map: mapInstance,
                     path: coords[0].map(p => new mapsApi.LatLng(p[1], p[0])),
                   })
-                break;
+                break
                 
                 case "circle": 
                   shape = new mapsApi.Circle({
@@ -709,7 +744,7 @@ export default class MapComponent extends Component {
                     // radius: radius*100,
                     radius: area.properties.radius * 1,
                   })
-                break;
+                break
                 
                 default: 
                   coords[0].forEach(p => bounds.extend(new mapsApi.LatLng(p[1], p[0])))
@@ -718,10 +753,10 @@ export default class MapComponent extends Component {
                     map: mapInstance,
                     bounds
                   })
-                break;
+                break
               }
   
-              this.addEventHandlers(shape, area.properties.type, "fetch", area.id)
+              this.addEventHandlers(shape, area.properties.type, "fetch", area)
             })
             // })
           }
@@ -755,14 +790,220 @@ export default class MapComponent extends Component {
     palette.filter(c => c.tagId === tag.id)[0].tagId = null
   }
 
-  clearInfluence = shape => {
-    l(shape)
+  clearInfluence = currShape => {
+    // l(currShape)
+    let { currentTag, mapsApi } = this.state
+    currShape.outer.setMap(null)
+    currShape.undo = true
+    currShape.undoTime = 10
+    this.setState({ currentTag })
+
+    currShape.interval = setInterval(() => {
+      currShape.undoTime-=1
+      if (currShape.undoTime === 0) {
+        clearInterval(currShape.interval)
+        currShape.undo = false
+        currShape.undoNotAllowed = true
+        currShape.influence = 0
+        
+        switch (currShape.type) {
+          case "polygon":
+            mapsApi.event.clearListeners(currShape.outer, "set_at")
+            mapsApi.event.clearListeners(currShape.outer, "insert_at")
+            break;
+          case "circle":
+            mapsApi.event.clearListeners(currShape.outer, "radius_changed")
+            break;
+          default:
+            mapsApi.event.clearListeners(currShape.outer, "bounds_changed")
+            break;
+        }
+      }
+      this.setState({ currentTag })
+    }, 1000)
+  }
+  
+  undoClearInfluence = currShape => {
+    // l(currShape)
+    let { currentTag, mapInstance } = this.state
+    currShape.outer.setMap(mapInstance)
+    currShape.undo = false
+    clearInterval(currShape.interval)
+    this.setState({ currentTag })
   }
 
   save = () => {
     l("createArray", createArray)
     l("updateArray", updateArray)
     l("deleteArray", deleteArray)
+    
+    const { tags } = this.state
+    , getShapeForRequest = ({ tagId, shapeId }) => {
+      let currTag = tags.filter(t => t.id === tagId)[0]
+      , currShape = currTag.shapes.filter(s => s.shapeId === shapeId)[0]
+      , { shape, outer } = currShape
+      , retObj
+      
+      switch (currShape.type){        
+        case "polygon": 
+          let shape_points = shape.getPath().getArray()
+          , shape_coords = shape_points.map(pt => [pt.lng(), pt.lat()])
+          , outer_points = outer.getPath().getArray()
+          , outer_coords = outer_points.map(pt => [pt.lng(), pt.lat()])
+
+          shape_coords.push([shape_points[0].lng(), shape_points[0].lat()])
+          outer_coords.push([outer_points[0].lng(), outer_points[0].lat()])
+
+          retObj = {
+            geometry: {
+              type: "Polygon",
+              coordinates: [ shape_coords ]                
+            },
+            properties: {
+              type: "polygon"
+            },
+            influence_polygon: {
+              geometry: {
+                type: "Polygon",
+                coordinates: [ outer_coords ]
+              },
+              properties: {
+                type: "polygon"
+              }
+            }
+          }
+        break
+        
+        case "circle": 
+          retObj = {
+            geometry: {
+              type: "Point",
+              coordinates: [
+                shape.getCenter().lng(),
+                shape.getCenter().lat()
+              ]
+            },
+            properties: {
+              "radius": shape.getRadius(),
+              "type": "circle"
+            },
+            influence_polygon: {
+              geometry: {
+                coordinates: [
+                  outer.getCenter().lng(),
+                  outer.getCenter().lat()
+                ]
+              },
+              properties: {
+                radius: outer.getRadius(),
+                type: "circle"
+              }
+            }
+          }
+        break
+        
+        default: 
+          let inner_ne = shape.getBounds().getNorthEast()
+          , inner_sw = shape.getBounds().getSouthWest()
+          , outer_ne = outer.getBounds().getNorthEast()
+          , outer_sw = outer.getBounds().getSouthWest()
+          , vertices_inner = [ // Starting from ne
+            [inner_ne.lng(), inner_ne.lat()],
+            [inner_ne.lng(), inner_sw.lat()],
+            [inner_sw.lng(), inner_sw.lat()],
+            [inner_sw.lng(), inner_ne.lat()],
+            [inner_ne.lng(), inner_ne.lat()],
+          ]
+          , vertices_outer = [ // Starting from ne
+            [outer_ne.lng(), outer_ne.lat()],
+            [outer_ne.lng(), outer_sw.lat()],
+            [outer_sw.lng(), outer_sw.lat()],
+            [outer_sw.lng(), outer_ne.lat()],
+            [outer_ne.lng(), outer_ne.lat()],
+          ] 
+
+          retObj = {
+            geometry: {
+              type: "Polygon",
+              coordinates: [ vertices_inner ]
+            },
+            properties: {
+              bounds: {
+                south: inner_sw.lat(),
+                west: inner_sw.lng(),
+                north: inner_ne.lat(),
+                east: inner_ne.lng()
+              },
+              type: "rectangle"
+            },
+            influence_polygon: {
+              geometry: {
+                type: "Polygon",
+                coordinates: [ vertices_outer ]
+              },
+              properties: {
+                bounds: {
+                  south: outer_sw.lat(),
+                  west: outer_sw.lng(),
+                  north: outer_ne.lat(),
+                  east: outer_ne.lng()
+                },
+                // bounds: {
+                //   south: 40.73484702898561,
+                //   west: -73.9879336609497,
+                //   north: 40.738293908072286,
+                //   east: -73.9827838196411
+                // },
+                type: "rectangle"
+              }
+            }
+          }
+        break
+      }
+
+      return retObj
+    }
+    
+    let tmpObj = {}
+    if(createArray.length){
+      createArray.forEach(el => {
+        if (tmpObj[el.tagId]) tmpObj[el.tagId].areas.push(getShapeForRequest(el))
+        else tmpObj[el.tagId] = { id: el.tagId, areas: [getShapeForRequest(el)] }
+      })
+
+      l(Object.values(tmpObj))
+      this.http
+      .post('/api/v1/tags-influence', { tags: Object.values(tmpObj) }, auth)
+      .then(res => {
+        l(res)
+        createArray.length = 0
+        // Here remove the original shapes and draw from result
+      })
+      .catch(err => l(err))
+    }
+
+    if(deleteArray.length){
+      tmpObj = {}
+      deleteArray.forEach(el => {
+        if (tmpObj[el.tagId]) tmpObj[el.tagId].areas.push(el.id)
+        else tmpObj[el.tagId] = { tag_id: el.tagId, ids: [el.id] }
+      })
+      
+      l(Object.values(tmpObj))
+      Object.values(tmpObj).forEach(el => {
+        this.http
+        .delete('/api/v1/tags-influence', el, auth)
+        .then(res => {
+          l(res)
+          deleteArray = deleteArray.filter(item => item.tagId !== el.tagId)
+        })
+        .catch(err => l(err))
+      })
+    }
+
+    if(updateArray.length){
+      l("Balle balle")
+    }
   }
 
   render() {
@@ -844,10 +1085,14 @@ export default class MapComponent extends Component {
                   return (
                     s.selected ? <InfluenceBox
                     key={idx}
-                    onClearInfluence={() => this.clearInfluence(s)}
-                    lat={s.outer.getTopRight().lat()}
-                    lng={s.outer.getTopRight().lng()}
+                    lat={s.getInfPos().lat()}
+                    lng={s.getInfPos().lng()}
                     text={`${s.influence} m`}
+                    onClearInfluence={() => this.clearInfluence(s)}
+                    undo={s.undo}
+                    undoTime={s.undoTime}
+                    undoNotAllowed={s.undoNotAllowed}
+                    onUndo={() => this.undoClearInfluence(s)}
                   /> : null
                 )
               })
