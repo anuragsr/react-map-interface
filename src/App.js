@@ -30,12 +30,12 @@ export default class App extends Component {
         password: ck.x_p
       }, this.login)
     }
-    // else{
-    //   this.setState({
-    //     username: 'contenter',
-    //     password: 'ExXgB6QjfQUwyMm7gcEd'
-    //   }, this.login)
-    // }
+    else{
+      this.setState({
+        username: 'contenter',
+        password: 'ExXgB6QjfQUwyMm7gcEd'
+      }, this.login)
+    }
   }
 
   handleInputChange = event => {
@@ -94,7 +94,7 @@ export default class App extends Component {
   render() {
     return (
       <>
-        {!this.state.isAuth && <div className="h-100">
+        {/* {!this.state.isAuth && <div className="h-100">
           <Background />
           <div className="login-outer">
             <div className="login-box">
@@ -117,8 +117,8 @@ export default class App extends Component {
         </div>}
         {this.state.isAuth && <div className="h-100">
           <MapComponent logout={this.logout} />
-        </div>}
-        {/* <MapComponent/> */}
+        </div>} */}
+        <MapComponent/>
       </>
     )
   }

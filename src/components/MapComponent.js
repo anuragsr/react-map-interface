@@ -225,16 +225,22 @@ export default class MapComponent extends Component {
   }
   
   shapeSelected = shape => {
-    let { currentTag } = this.state
+    let { currentTag, mapInstance } = this.state
     , currentShape = findShapeGroupById(currentTag.shapes, shape.shapeId)
 
-    currentTag.shapes.forEach(s => s.selected = false)
+    currentTag.shapes.forEach(s => {
+      s.selected = false
+      s.outer.setMap(null)
+      s.shape.setEditable(false)
+      s.outer.setEditable(false)
+    })
     currentShape.selected = true
+    currentShape.shape.setEditable(true)
+    currentShape.outer.setEditable(true)
+    currentShape.outer.setMap(mapInstance)
     this.setState({ currentTag })
   }
 
-  // addEventHandlers = (shape, type, method, area) => {
-  //   let { mapsApi, mapInstance, currentTag, drawingManager } = this.state
   addEventHandlers = (shape, type, method, area, currentTag) => {    
     if (method === "draw") currentTag = this.state.currentTag
 
@@ -250,7 +256,7 @@ export default class MapComponent extends Component {
       strokeWeight: 2,
       fillColor: currentTag.color,
       fillOpacity: 0.35,
-      editable: true,
+      // editable: true,
       suppressUndo: true,
       // clickable: true,
       // draggable: true,
@@ -398,19 +404,20 @@ export default class MapComponent extends Component {
         outer = new mapsApi.Circle({ ...outerShapeProps })
         
         if (method === "draw"){
-          outer.setMap(mapInstance)
           outer.setRadius(shape.getRadius() + this.props.influence)
           outer.setCenter(shape.getCenter())
+          outer.setMap(mapInstance)
         } else {
           // Here the correct coords must be used for outer shape
-          outer.setRadius(inf_poly.properties.influence_radius)          
+          // outer.setRadius(shape.getRadius() + inf_poly.properties.influence_radius)
+          outer.setRadius(inf_poly.properties.influence_radius)
           outer.setCenter(
             new mapsApi.LatLng(
               inf_poly.geometry.coordinates[1],
               inf_poly.geometry.coordinates[0]
             )
-          )
-
+          )          
+          
           // Show the shape if shape added to the currently selected tag
           if (currentTag.id === this.state.currentTag.id){
             outer.setMap(mapInstance)
@@ -418,7 +425,8 @@ export default class MapComponent extends Component {
             outer.setMap(null)
           }
         }        
-
+                
+        outer.setMap(null)
         outer.addListener("radius_changed", () => {
           // Change influence according to new radius
           let currentShape = findShapeGroupById(currentTag.shapes, outer.shapeId)
@@ -609,7 +617,7 @@ export default class MapComponent extends Component {
 
     outer.shapeId = shapeId
     outer.addListener("click", () => this.shapeSelected(outer))
-    // outer.addListener("click", e => { l(e); this.shapeSelected(outer) })
+     // outer.addListener("click", e => { l(e); this.shapeSelected(outer) })
 
     currentTag.shapes.forEach(s => s.selected = false)
     shapeObj = {
@@ -645,8 +653,9 @@ export default class MapComponent extends Component {
     let { mapsApi } = this.state, inf
 
     // Here the correct coords must be used for calculating influence
-    switch(area.properties.type){            
+    switch(area.properties.type){
       case 'circle':
+        // inf = area.influence_polygon.properties.influence_radius
         inf = Math.round(area.influence_polygon.properties.influence_radius - area.properties.radius)
         break;
         
@@ -731,7 +740,7 @@ export default class MapComponent extends Component {
       fillColor: tag.color,
       fillOpacity: 1,
       clickable: true,
-      editable: true,
+      // editable: true,
       suppressUndo: true,
       draggable: true,
       zIndex: 1,
@@ -972,6 +981,7 @@ export default class MapComponent extends Component {
               },
               properties: {
                 radius: outer.getRadius(),
+                // radius: outer.getRadius() - shape.getRadius(),
                 type: "circle"
               }
             }
@@ -1162,8 +1172,8 @@ export default class MapComponent extends Component {
           </div>
         </nav>
         <div className="wrapper">
-          {/* <div className="sidebar hidden" onClick={this.tagDeselected}>{ */}
-          <div className="sidebar" onClick={this.tagDeselected}>{
+          <div className="sidebar hidden" onClick={this.tagDeselected}>{
+          // <div className="sidebar" onClick={this.tagDeselected}>{
             tags.length > 0 && tags.map((tag, idx) => {
               return (
                 <div 
@@ -1197,7 +1207,7 @@ export default class MapComponent extends Component {
                 </div>
               )
             })
-            }{
+          }{
             tags.length === 0 && <h4>No tags selected</h4>
           }</div>
           <div className="content">
@@ -1248,15 +1258,15 @@ export default class MapComponent extends Component {
               />
             </div>
             <div className={`draw-shape ${canDraw ? "" : "disabled"}`} ref={this.drawshapes}>
-              <div className="ctn-icon" onClick={() => this.startDrawing("polygon")}>
+              <div className="ctn-icon" onClick={() => canDraw && this.startDrawing("polygon")}>
                 <img className="pr" src="assets/edit-grey.svg" alt="" />
                 <img className="sc" src="assets/edit-active.svg" alt="" />
               </div>
-              <div className="ctn-icon" onClick={() => this.startDrawing("circle")}>
+              <div className="ctn-icon" onClick={() => canDraw && this.startDrawing("circle")}>
                 <img className="pr" src="assets/circle-grey.svg" alt="" />
                 <img className="sc" src="assets/circle-active.svg" alt="" />
               </div>
-              <div className="ctn-icon" onClick={() => this.startDrawing("rectangle")}>
+              <div className="ctn-icon" onClick={() => canDraw && this.startDrawing("rectangle")}>
                 <img className="pr" src="assets/square-grey.svg" alt="" />
                 <img className="sc" src="assets/square-active.svg" alt="" />
               </div>
