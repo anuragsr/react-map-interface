@@ -23,8 +23,11 @@ const InfluenceBox = ({ text, onClearInfluence, undo, undoTime, undoNotAllowed, 
     </div>
   )
 }
-
-const checkDuplicate = (items, item) => {
+, hex2rgba = (hex, alpha = 1) => {
+  const [r, g, b] = hex.match(/\w\w/g).map(x => parseInt(x, 16))
+  return `rgba(${r},${g},${b},${alpha})`
+}
+, checkDuplicate = (items, item) => {
   return !!items.filter(t => t.id === item.id).length
 }
 , findShapeGroupById = (shapes, id) => {
@@ -619,7 +622,16 @@ export default class MapComponent extends Component {
     outer.addListener("click", () => this.shapeSelected(outer))
      // outer.addListener("click", e => { l(e); this.shapeSelected(outer) })
 
-    currentTag.shapes.forEach(s => s.selected = false)
+    currentTag.shapes.forEach(s => {
+      s.selected = false
+      s.shape.setOptions({
+        editable: false
+      })
+      s.outer.setOptions({
+        editable: false,
+        map: null
+      })
+    })
     shapeObj = {
       shapeId, // For drawing operations
       type,
@@ -688,7 +700,7 @@ export default class MapComponent extends Component {
       strokeOpacity: 1,
       strokeWeight: 2,
       fillColor: currentTag.color,
-      fillOpacity: 1,
+      fillOpacity: .8,
       clickable: true,
       editable: true,
       suppressUndo: true,
@@ -708,8 +720,14 @@ export default class MapComponent extends Component {
         if(t.shapes.length) {
           t.shapes[0].selected = true
           t.shapes.forEach(s => {
-            s.shape.setMap(mapInstance)
-            s.outer.setMap(mapInstance)
+            s.shape.setOptions({
+              clickable: true,
+              draggable: true,
+              // editable: false,
+              map: mapInstance
+            })
+            // s.shape.setMap(mapInstance)
+            // s.outer.setMap(mapInstance)
           })
         }
       }
@@ -738,7 +756,7 @@ export default class MapComponent extends Component {
       strokeOpacity: 1,
       strokeWeight: 2,
       fillColor: tag.color,
-      fillOpacity: 1,
+      fillOpacity: .8,
       clickable: true,
       // editable: true,
       suppressUndo: true,
@@ -842,8 +860,20 @@ export default class MapComponent extends Component {
       t.active = false
       t.shapes.forEach(s => {
         s.selected = false
-        s.shape.setMap(null)
-        s.outer.setMap(null)
+        // s.shape.setMap(null)
+        s.shape.setOptions({
+          clickable: false,
+          draggable: false,
+          editable: false,
+        })
+        // s.shape.clickable(false)
+        // s.shape.setDraggable(false)
+        // s.shape.setEditable(false)
+        // s.outer.setMap(null)
+        s.outer.setOptions({
+          editable: false,
+          map: null
+        })
       })
     })
     drawingManager.setDrawingMode(null)
@@ -1172,43 +1202,37 @@ export default class MapComponent extends Component {
           </div>
         </nav>
         <div className="wrapper">
-          <div className="sidebar hidden" onClick={this.tagDeselected}>{
-          // <div className="sidebar" onClick={this.tagDeselected}>{
+          <div className="sidebar" onClick={this.tagDeselected}>{
             tags.length > 0 && tags.map((tag, idx) => {
               return (
                 <div 
                   key={idx} 
-                  className={`row mx-0 py-2 tag-row ${tag.active ? "active" : ""} `}
+                  className={`tag-row ${tag.active ? "active" : ""} `}
                   onClick={e => { sp(e); this.tagSelected(tag) }}
+                  title={tag.full_name}
                   >
-                  <div className="col-1">
                     <div 
                       className="tag-color"
                       style={{
                         border: `1px solid ${tag.color}`,
                         borderRadius: 2,
-                        background: `${tag.color}`
+                        backgroundColor: `${hex2rgba(tag.color, .3)}`
                       }}
                     ></div>
-                  </div>
-                  <div className="col-2">{
-                    tag.image ?
+                    {tag.image ?
                     <img className="tag-img" src={tag.image} alt="" /> :
-                    <img className="tag-img" src="assets/tag-plh.png" alt="" />
-                  }</div>
-                  <div className="col-7 tag-title p-0">{tag.full_name}</div>
-                  <div className="col-1">
+                    <img className="tag-img" src="assets/tag-plh.png" alt="" />}
+                    <div className="tag-title">{tag.full_name}</div>
                     <img 
                       src="assets/delete-tag-black.svg" 
                       className="tag-delete" 
                       onClick={e => { sp(e); this.tagDeleted(tag) }}
                       alt=""/>
-                  </div>
                 </div>
               )
             })
           }{
-            tags.length === 0 && <h4>No tags selected</h4>
+            tags.length === 0 && <h5>No tags selected</h5>
           }</div>
           <div className="content">
             <GoogleMapReact

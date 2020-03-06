@@ -35,19 +35,22 @@
 		height: calc(100% - 60px);
 		align-items: stretch;
 		.sidebar {
-			padding: 20px;
-			width: $sb-mg;
+      width: $sb-mg;
+			padding: $sb-pd;
 			background: $w;
 			box-shadow: 1px 0 0 0 rgba($b, .05);
-			transition: all 0.3s;
+      transition: all 0.3s;
+      overflow-y: auto;
 			&.hidden {
 				margin-left: -1 * $sb-mg;
 			}
 			.tag-row{
-				align-items: center;
+				@extend %j-f-s;
 				margin-bottom: 10px;
 				border: 1px solid transparent;
-				cursor: pointer;
+        cursor: pointer;
+        height: 42px;
+        padding: 0 9px;
 				&:hover, &.active{
 					border-radius: 5px;
 					border: 1px solid $tag-bdr;
@@ -56,17 +59,30 @@
 				.tag-color{
 					height: 12px;
 					width: 12px;
-				}
+        }
+        .tag-img{
+          margin-left: 9px;
+        }
 				.tag-title{
-					font-size: 15px;
+          color: $b;
+          max-width: 144px;
+          white-space: nowrap;
+          margin-left: 4px;
+          font-size: 15px;
+          text-overflow: ellipsis;
+          overflow: hidden;
+          direction: rtl;
+          margin-bottom: 2px;
 				}
 				.tag-delete{
-					height: 10px;
+					height: 7px;
+          margin-left: 11px;
 				}
 			}
 		}
 		.content {
-			@extend %fhw;
+      @extend %fhw;
+		  width: calc(100% - 260px);    
 			.ctn-icon{
 				@extend %j-c;
 				height: 40px;
