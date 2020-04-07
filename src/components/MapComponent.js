@@ -3,23 +3,25 @@
 import React, { Component } from 'react'
 import $ from 'jquery'
 import GoogleMapReact from 'google-map-react'
+import Switch from 'react-switch'
 import { l, cl, auth, generateColor, sp, rand, randBetween } from '../helpers/common'
 
 import SearchBox from './SearchBox'
 import AutoComplete from './AutoComplete'
 import HttpService from '../services/HttpService'
 
-const InfluenceBox = ({ text, onClearInfluence, undo, undoTime, undoNotAllowed, onUndo }) => {
+const InfluenceBox = ({ text, onClearInfluence, onResetInfluence, undo, undoTime, undoNotAllowed, onUndo }) => {
   return (
     <div className="ctn-influence">
-      {undo && <>
+      {/* {undo && <>
         <a href="javascript:void(0)" onClick={onUndo}>Undo</a>
         &nbsp;&nbsp;{undoTime}
       </>}
       {!undo && <>
         {text}
         {!undoNotAllowed && <img onClick={onClearInfluence} src="assets/clear.svg" alt=""/>}
-      </>}
+      </>} */}
+      {text} <img onClick={onResetInfluence} src="assets/refresh.png" alt=""/>
     </div>
   )
 }
@@ -100,6 +102,7 @@ export default class MapComponent extends Component {
       canDraw: false,
       showNotif: false,
       notifType: "success",
+      show: false
     }
   }
 
@@ -237,6 +240,8 @@ export default class MapComponent extends Component {
       s.shape.setEditable(false)
       s.outer.setEditable(false)
     })
+    currentTag.showInfluenceShape = true
+
     currentShape.selected = true
     currentShape.shape.setEditable(true)
     currentShape.outer.setEditable(true)
@@ -276,6 +281,9 @@ export default class MapComponent extends Component {
     shape.shapeId = shapeId
     shape.addListener("click", () => this.shapeSelected(shape))
     shape.addListener("drag", () => this.shapeSelected(shape))
+    shape.setOptions({
+      clickable: false
+    })
 
     switch(type){
       case "polygon":
@@ -621,6 +629,10 @@ export default class MapComponent extends Component {
     outer.shapeId = shapeId
     outer.addListener("click", () => this.shapeSelected(outer))
      // outer.addListener("click", e => { l(e); this.shapeSelected(outer) })
+    outer.setOptions({
+      map: null, 
+      clickable: false
+    })
 
     currentTag.shapes.forEach(s => {
       s.selected = false
@@ -639,7 +651,8 @@ export default class MapComponent extends Component {
       outer,
       selected: true,
       getInfPos: function () {
-        if (!this.undo && !this.undoNotAllowed) return this.outer.getTopRight()
+        // if (!this.undo && !this.undoNotAllowed) return this.outer.getTopRight()
+        if (currentTag.showInfluenceShape) return this.outer.getTopRight()
         return this.shape.getTopRight()
       },
     }
@@ -717,6 +730,7 @@ export default class MapComponent extends Component {
     tags.forEach(t => {
       if (t.id === currentTag.id){
         t.active = true
+        // t.showInfluenceShape = true
         if(t.shapes.length) {
           t.shapes[0].selected = true
           t.shapes.forEach(s => {
@@ -848,6 +862,7 @@ export default class MapComponent extends Component {
 
     tag.color = this.chooseColor(tag)
     tag.shapes = []
+    tag.showInfluenceShape = false
     tags.push(tag)
     this.setState({ tags }, this.tagSelected(tag))
   }
@@ -858,6 +873,7 @@ export default class MapComponent extends Component {
 
     tags.forEach(t => {
       t.active = false
+      t.showInfluenceShape = false
       t.shapes.forEach(s => {
         s.selected = false
         // s.shape.setMap(null)
@@ -899,6 +915,7 @@ export default class MapComponent extends Component {
     palette.filter(c => c.tagId === tag.id)[0].tagId = null
   }
 
+  // Sets influence to 0, hides the outer shape
   clearInfluence = currShape => {
     // l(currShape)
     let { currentTag, mapsApi } = this.state
@@ -938,6 +955,36 @@ export default class MapComponent extends Component {
     currShape.outer.setMap(mapInstance)
     currShape.undo = false
     clearInterval(currShape.interval)
+    this.setState({ currentTag })
+  }
+
+  // Resets influence to 3m (default), keeps outer shape  
+  resetInfluence = currShape => {
+    let { currentTag, mapsApi } = this.state    
+    , sph = mapsApi.geometry.spherical
+
+    currShape.influence = this.props.influence
+
+    switch (currShape.type) {
+      case "polygon":
+        currShape.outer.setPath(currShape.shape.getPath().getArray().map(pt => 
+          sph.computeOffset(pt, currShape.influence, getBearing(currShape.shape.getCenter(), pt)))
+        )
+        break;
+      case "circle":
+        currShape.outer.setRadius(currShape.shape.getRadius() + currShape.influence)        
+        break;
+      default:
+        let innerBounds = currShape.shape.getBounds()
+        , inner_ne = innerBounds.getNorthEast()
+        , inner_sw = innerBounds.getSouthWest()
+
+        currShape.outer.setBounds(new mapsApi.LatLngBounds(
+          sph.computeOffset(inner_sw, currShape.influence * Math.sqrt(2), 225),
+          sph.computeOffset(inner_ne, currShape.influence * Math.sqrt(2), 45),
+        ))
+        break;
+    }
     this.setState({ currentTag })
   }
 
@@ -1172,6 +1219,27 @@ export default class MapComponent extends Component {
     }, 3000)
   }
 
+  sidebarClicked = e => {    
+    if($(e.target).hasClass("react-switch-handle") || $(e.target).hasClass("react-switch-bg")) sp(e)
+    else this.tagDeselected()
+  }
+
+  toggleInfluenceShape = currentTag => {
+    let { mapInstance } = this.state
+    currentTag.showInfluenceShape = !currentTag.showInfluenceShape    
+    currentTag.shapes.forEach(s => {
+      s.outer.setOptions({        
+        map: currentTag.showInfluenceShape ? mapInstance: null
+      })
+    })
+    this.setState({ currentTag })    
+  }
+
+  toggled = show => {
+    // sp(e)
+    this.setState({ show })    
+  }
+
   render() {
     const { 
       mapsApiLoaded, mapInstance, mapsApi, 
@@ -1202,38 +1270,58 @@ export default class MapComponent extends Component {
           </div>
         </nav>
         <div className="wrapper">
-          <div className="sidebar" onClick={this.tagDeselected}>{
-            tags.length > 0 && tags.map((tag, idx) => {
+          <div className="sidebar" onClick={e => this.sidebarClicked(e)}>
+            { tags.length > 0 && 
+              <div className="tag-row-outer">
+                <div className="tag-label">Tag</div> 
+                <div className="tag-label text-center">Influence<br/> Polygon</div>               
+              </div> 
+            }
+            {tags.length > 0 && tags.map((tag, idx) => {
               return (
-                <div 
-                  key={idx} 
-                  className={`tag-row ${tag.active ? "active" : ""} `}
-                  onClick={e => { sp(e); this.tagSelected(tag) }}
-                  title={tag.full_name}
-                  >
-                    <div 
-                      className="tag-color"
-                      style={{
-                        border: `1px solid ${tag.color}`,
-                        borderRadius: 2,
-                        backgroundColor: `${hex2rgba(tag.color, .3)}`
-                      }}
-                    ></div>
-                    {tag.image ?
-                    <img className="tag-img" src={tag.image} alt="" /> :
-                    <img className="tag-img" src="assets/tag-plh.png" alt="" />}
-                    <div className="tag-title">{tag.full_name}</div>
-                    <img 
-                      src="assets/delete-tag-black.svg" 
-                      className="tag-delete" 
-                      onClick={e => { sp(e); this.tagDeleted(tag) }}
-                      alt=""/>
+                <div className="tag-row-outer" key={idx}>
+                  <div 
+                    className={`tag-row ${tag.active ? "active" : ""} `}
+                    onClick={e => { sp(e); this.tagSelected(tag) }}
+                    title={tag.full_name}
+                    >
+                      <div 
+                        className="tag-color"
+                        style={{
+                          border: `1px solid ${tag.color}`,
+                          borderRadius: 2,
+                          backgroundColor: `${hex2rgba(tag.color, .3)}`
+                        }}
+                      ></div>
+                      {tag.image ?
+                      <img className="tag-img" src={tag.image} alt="" /> :
+                      <img className="tag-img" src="assets/tag-plh.png" alt="" />}
+                      <div className="tag-title">{tag.full_name}</div>
+                      <img 
+                        src="assets/delete-tag-black.svg" 
+                        className="tag-delete" 
+                        onClick={e => { sp(e); this.tagDeleted(tag) }}
+                        alt=""/>
+                  </div>
+                  <Switch
+                    className="tag-toggle"
+                    // checked={this.state.show}
+                    // onChange={this.toggled}
+                    checked={tag.showInfluenceShape}
+                    onChange={() => this.toggleInfluenceShape(tag)}
+                    uncheckedIcon={false}
+                    checkedIcon={false}
+                    handleDiameter={6}
+                    onColor="#5ca9fc"
+                    onHandleColor="#fff"
+                    height={20}
+                    width={40}
+                  />
                 </div>
               )
-            })
-          }{
-            tags.length === 0 && <h5>No tags selected</h5>
-          }</div>
+            })}            
+            {tags.length === 0 && <h5>No tags selected</h5>}
+          </div>
           <div className="content">
             <GoogleMapReact
               options={{ streetViewControl: true }}
@@ -1254,6 +1342,7 @@ export default class MapComponent extends Component {
                     lng={s.getInfPos().lng()}
                     text={`${s.influence} m`}
                     onClearInfluence={() => this.clearInfluence(s)}
+                    onResetInfluence={() => this.resetInfluence(s)}
                     undo={s.undo}
                     undoTime={s.undoTime}
                     undoNotAllowed={s.undoNotAllowed}

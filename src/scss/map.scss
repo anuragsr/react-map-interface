@@ -43,42 +43,56 @@
       overflow-y: auto;
 			&.hidden {
 				margin-left: -1 * $sb-mg;
-			}
-			.tag-row{
-				@extend %j-f-s;
-				margin-bottom: 10px;
-				border: 1px solid transparent;
-        cursor: pointer;
-        height: 42px;
-        padding: 0 9px;
-				&:hover, &.active{
-					border-radius: 5px;
-					border: 1px solid $tag-bdr;
-					background-color: $tag-bg;
-				}
-				.tag-color{
-					height: 12px;
-					width: 12px;
+      }
+      .tag-row-outer{
+        @extend %j-s-b;
+        margin-bottom: 10px;
+        .tag-label{
+          color: $tag-lbl;
+          font-family: $sp-m;
+          font-size: 10px;
+          font-weight: bold;
+          letter-spacing: 1px;
+          &:nth-child(1){ padding-left: 9px; }
+          &:nth-child(2){ padding-right: 9px; }
         }
-        .tag-img{
-          margin-left: 9px;
+        .tag-row{
+          @extend %j-f-s;
+          border: 1px solid transparent;
+          cursor: pointer;
+          width: 240px;
+          height: 42px;
+          padding: 0 9px;
+          &:hover, &.active{
+            border-radius: 5px;
+            border: 1px solid $tag-bdr;
+            background-color: $tag-bg;
+          }
+          .tag-color{
+            height: 12px;
+            width: 12px;
+          }
+          .tag-img{
+            margin-left: 9px;
+          }
+          .tag-title{
+            color: $b;
+            max-width: 144px;
+            white-space: nowrap;
+            margin-left: 4px;
+            font-size: 15px;
+            text-overflow: ellipsis;
+            overflow: hidden;
+            direction: rtl;
+            margin-bottom: 2px;
+          }
+          .tag-delete{
+            height: 7px;
+            margin-left: 11px;
+          }
         }
-				.tag-title{
-          color: $b;
-          max-width: 144px;
-          white-space: nowrap;
-          margin-left: 4px;
-          font-size: 15px;
-          text-overflow: ellipsis;
-          overflow: hidden;
-          direction: rtl;
-          margin-bottom: 2px;
-				}
-				.tag-delete{
-					height: 7px;
-          margin-left: 11px;
-				}
-			}
+        .tag-toggle{ padding-right: 9px; }
+      }
 		}
 		.content {
       @extend %fhw;
@@ -214,7 +228,8 @@
 			white-space: nowrap;
 			img{
 				cursor: pointer;
-				margin-left: 10px;	
+        margin-left: 10px;	
+        height: 18px;
 			}
 			a{
 				color: $w;
