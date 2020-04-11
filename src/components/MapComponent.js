@@ -240,7 +240,7 @@ export default class MapComponent extends Component {
       s.shape.setEditable(false)
       s.outer.setEditable(false)
     })
-    currentTag.showInfluenceShape = true
+    // currentTag.showInfluenceShape = true
 
     currentShape.selected = true
     currentShape.shape.setEditable(true)
@@ -281,9 +281,7 @@ export default class MapComponent extends Component {
     shape.shapeId = shapeId
     shape.addListener("click", () => this.shapeSelected(shape))
     shape.addListener("drag", () => this.shapeSelected(shape))
-    shape.setOptions({
-      clickable: false
-    })
+    // shape.setOptions({ clickable: false })
 
     switch(type){
       case "polygon":
@@ -652,8 +650,9 @@ export default class MapComponent extends Component {
       selected: true,
       getInfPos: function () {
         // if (!this.undo && !this.undoNotAllowed) return this.outer.getTopRight()
-        if (currentTag.showInfluenceShape) return this.outer.getTopRight()
-        return this.shape.getTopRight()
+        // if (currentTag.showInfluenceShape) return this.outer.getTopRight()
+        // return this.shape.getTopRight()
+        return this.outer.getTopRight()
       },
     }
     if (method === "draw") {
@@ -733,6 +732,12 @@ export default class MapComponent extends Component {
         // t.showInfluenceShape = true
         if(t.shapes.length) {
           t.shapes[0].selected = true
+          t.shapes[0].outer.setOptions({
+            // clickable: true,
+            // draggable: true,
+            // editable: true,
+            map: mapInstance
+          })
           t.shapes.forEach(s => {
             s.shape.setOptions({
               clickable: true,
@@ -740,8 +745,8 @@ export default class MapComponent extends Component {
               // editable: false,
               map: mapInstance
             })
-            // s.shape.setMap(mapInstance)
             // s.outer.setMap(mapInstance)
+            // s.shape.setMap(mapInstance)
           })
         }
       }
@@ -1225,14 +1230,14 @@ export default class MapComponent extends Component {
   }
 
   toggleInfluenceShape = currentTag => {
-    let { mapInstance } = this.state
+    let { mapInstance, tags } = this.state
     currentTag.showInfluenceShape = !currentTag.showInfluenceShape    
     currentTag.shapes.forEach(s => {
-      s.outer.setOptions({        
-        map: currentTag.showInfluenceShape ? mapInstance: null
+      s.outer.setOptions({
+        map: (currentTag.showInfluenceShape || s.selected) ? mapInstance: null
       })
     })
-    this.setState({ currentTag })    
+    this.setState({ tags })
   }
 
   toggled = show => {
@@ -1250,7 +1255,7 @@ export default class MapComponent extends Component {
     return (
       <div className="map-outer">
         <nav className="navbar navbar-expand-lg navbar-dark">
-          <a className="navbar-brand" id="sidebar-collapse" href="javascript:void(0)">
+          <a className="navbar-brand" id="sidebar-collapse" href="#">
             <img src="assets/burger.svg" alt="" />
           </a>
           <div className="ml-auto">
@@ -1260,10 +1265,10 @@ export default class MapComponent extends Component {
                 <span className="mx-3">{this.state.username}</span>
               </li>
               <li className="nav-item dropdown">
-                <a className="nav-link dropdown-toggle" href="javascript:void(0)" data-toggle="dropdown">
+                <a className="nav-link dropdown-toggle" href="#" data-toggle="dropdown">
                 </a>
                 <div className="dropdown-menu">
-                  <a className="dropdown-item" onClick={this.logout} href="javascript:void(0)">Logout</a>
+                  <a className="dropdown-item" onClick={this.logout} href="#">Logout</a>
                 </div>
               </li>
             </ul>
