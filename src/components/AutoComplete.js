@@ -79,7 +79,7 @@ export default class AutoComplete extends Component {
   onSuggestionSelected = (event, { suggestion, suggestionValue, suggestionIndex, sectionIndex, method }) => {
     // l({ suggestion, suggestionValue, suggestionIndex, sectionIndex, method })
     this.props.optionSelected(suggestion, method)
-    this.setState({ suggestions: [] })
+    this.setState({ suggestions: [], value: "" })
   }
 
   shouldRenderSuggestions = value => typeof value !== "undefined" && value.trim().length > 0  

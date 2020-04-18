@@ -647,7 +647,7 @@ export default class MapComponent extends Component {
       type,
       shape,
       outer,
-      selected: true,
+      // selected: true,
       getInfPos: function () {
         // if (!this.undo && !this.undoNotAllowed) return this.outer.getTopRight()
         // if (currentTag.showInfluenceShape) return this.outer.getTopRight()
@@ -731,7 +731,7 @@ export default class MapComponent extends Component {
         t.active = true
         // t.showInfluenceShape = true
         if(t.shapes.length) {
-          t.shapes[0].selected = true
+          // t.shapes[0].selected = true
           t.shapes[0].outer.setOptions({
             // clickable: true,
             // draggable: true,
