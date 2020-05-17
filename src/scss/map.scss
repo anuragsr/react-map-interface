@@ -96,7 +96,7 @@
 		}
 		.content {
       @extend %fhw;
-		  width: calc(100% - 260px);    
+		  // width: calc(100% - 260px);    
 			.ctn-icon{
 				@extend %j-c;
 				height: 40px;

@@ -30,7 +30,7 @@ export default class App extends Component {
         password: ck.x_p
       }, this.login)
     }
-    // else{
+    // else {
     //   this.setState({
     //     username: 'contenter',
     //     password: 'ExXgB6QjfQUwyMm7gcEd'

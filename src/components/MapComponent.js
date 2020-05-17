@@ -10,11 +10,13 @@ import SearchBox from './SearchBox'
 import AutoComplete from './AutoComplete'
 import HttpService from '../services/HttpService'
 
+import mapStyles from '../data/wb_color_for_influence_map.json'
+
 const InfluenceBox = ({ text, onClearInfluence, onResetInfluence, undo, undoTime, undoNotAllowed, onUndo }) => {
   return (
     <div className="ctn-influence">
       {/* {undo && <>
-        <a href="javascript:void(0)" onClick={onUndo}>Undo</a>
+        <a role="button" tabIndex="0" onClick={onUndo}>Undo</a>
         &nbsp;&nbsp;{undoTime}
       </>}
       {!undo && <>
@@ -94,6 +96,7 @@ export default class MapComponent extends Component {
     this.state = {
       name: 'Yul5ia',
       username: 'supervisor@mail.ru',
+      sidebarHidden: false,
       mapsApiLoaded: false,
       mapInstance: null,
       mapsApi: null,
@@ -107,23 +110,21 @@ export default class MapComponent extends Component {
   }
 
   static defaultProps = {
-    center: {
-      lat: 40.78343,
-      lng: -73.96625
-    },
+    center: { lat: 40.78343, lng: -73.96625 },
     zoom: 15,
-    // zoom: 20,
     influence: 3
   }
 
   componentDidMount(){
-    $(() => {
-      $('#sidebar-collapse').on('click', () => {
-        $('.sidebar').toggleClass('hidden')
-      })
-    })
+    // l(mapStyles)
   }
   
+  toggleSidebar = () => {
+    let { sidebarHidden } = this.state
+    sidebarHidden = !sidebarHidden
+    this.setState({ sidebarHidden })
+  }
+
   logout = () => this.props.logout()
   
   apiLoaded = (map, maps) => {
@@ -1249,13 +1250,14 @@ export default class MapComponent extends Component {
     const { 
       mapsApiLoaded, mapInstance, mapsApi, 
       currentTag, tags, canDraw, 
-      showNotif, notifType 
+      showNotif, notifType, sidebarHidden 
     } = this.state
+    , sidebarClass = `sidebar${sidebarHidden ? " hidden":""}`
 
     return (
       <div className="map-outer">
         <nav className="navbar navbar-expand-lg navbar-dark">
-          <a className="navbar-brand" id="sidebar-collapse" href="#">
+          <a className="navbar-brand" id="sidebar-collapse" role="button" tabIndex="0" onClick={this.toggleSidebar}>
             <img src="assets/burger.svg" alt="" />
           </a>
           <div className="ml-auto">
@@ -1275,7 +1277,7 @@ export default class MapComponent extends Component {
           </div>
         </nav>
         <div className="wrapper">
-          <div className="sidebar" onClick={e => this.sidebarClicked(e)}>
+          <div className={sidebarClass} onClick={e => this.sidebarClicked(e)}>
             { tags.length > 0 && 
               <div className="tag-row-outer">
                 <div className="tag-label">Tag</div> 
@@ -1329,7 +1331,10 @@ export default class MapComponent extends Component {
           </div>
           <div className="content">
             <GoogleMapReact
-              options={{ streetViewControl: true }}
+              options={{ 
+                streetViewControl: true,
+                styles: mapStyles
+              }}
               bootstrapURLKeys={{ 
                 libraries: ['drawing', 'geometry', 'places'],
                 key: 'AIzaSyB977EFLp4w9wVttk6Ne7s1CejK9LQyvsQ' 
@@ -1389,9 +1394,7 @@ export default class MapComponent extends Component {
                 <img className="sc" src="assets/square-active.svg" alt="" />
               </div>
             </div>
-            <button className="btn-accent" onClick={this.save} ref={this.savebtn}>
-              Save
-            </button>
+            <button className="btn-accent" onClick={this.save} ref={this.savebtn}>Save</button>
             {showNotif && <div className="notif">
               {notifType === "success" && "Data submitted successfully!"}
               {notifType === "failure" && "An error occured. Please try again."}
