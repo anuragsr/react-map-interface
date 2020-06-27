@@ -12,21 +12,11 @@ import HttpService from '../services/HttpService'
 
 import mapStyles from '../data/wb_color_for_influence_map.json'
 
-const InfluenceBox = ({ text, onClearInfluence, onResetInfluence, undo, undoTime, undoNotAllowed, onUndo }) => {
-  return (
-    <div className="ctn-influence">
-      {/* {undo && <>
-        <a role="button" tabIndex="0" onClick={onUndo}>Undo</a>
-        &nbsp;&nbsp;{undoTime}
-      </>}
-      {!undo && <>
-        {text}
-        {!undoNotAllowed && <img onClick={onClearInfluence} src="assets/clear.svg" alt=""/>}
-      </>} */}
-      {text} <img onClick={onResetInfluence} src="assets/refresh.png" alt=""/>
-    </div>
-  )
-}
+const InfluenceBox = ({ text, onResetInfluence }) => (
+  <div className="ctn-influence">
+    {text} <img onClick={onResetInfluence} src="assets/refresh.png" alt=""/>
+  </div>
+)
 , hex2rgba = (hex, alpha = 1) => {
   const [r, g, b] = hex.match(/\w\w/g).map(x => parseInt(x, 16))
   return `rgba(${r},${g},${b},${alpha})`
@@ -83,14 +73,16 @@ let palette = [
 , updateArray = []
 , deleteArray = []
 , submitTimer
+, undoRedoObj = { action: "", clicked: false, interval: {} }
 
 export default class MapComponent extends Component {
   constructor(props){
     super(props)
-    this.searchplaces = React.createRef()
-    this.savebtn = React.createRef()
     this.searchtags = React.createRef()
     this.drawshapes = React.createRef()
+    this.undobtns = React.createRef()
+    this.searchplaces = React.createRef()
+    this.savebtn = React.createRef()
 
     this.http = new HttpService()
     this.state = {
@@ -101,11 +93,13 @@ export default class MapComponent extends Component {
       mapInstance: null,
       mapsApi: null,
       currentTag: null,
+      currentShape: null,
       tags: [],
       canDraw: false,
       showNotif: false,
       notifType: "success",
-      show: false
+      show: false,
+      undoRedo: { enabled: false, type: "undo", time: 10 }
     }
   }
 
@@ -135,6 +129,9 @@ export default class MapComponent extends Component {
     this.savebtn.current.index = -1
     map.controls[maps.ControlPosition.RIGHT_TOP].push(this.searchplaces.current)
     map.controls[maps.ControlPosition.RIGHT_BOTTOM].push(this.savebtn.current)
+    
+    // Undo buttons
+    map.controls[maps.ControlPosition.TOP_CENTER].push(this.undobtns.current)
     
     // Adding methods to google maps namespace object prototypes
     maps.Rectangle.prototype.getCenter =  function() {
@@ -167,17 +164,7 @@ export default class MapComponent extends Component {
     
     maps.Circle.prototype.getTopRight = function () {
       return this.getBounds().getNorthEast()
-    }
-    
-    // Adding listeners for keyboard and open map areas
-    // maps.event.addListener(map, "click", e => {
-    //   l("map clicked", e)
-    //   let { currentTag } = this.state
-    //   if (currentTag){
-    //     currentTag.shapes.forEach(s => s.selected = false)
-    //     this.setState({ currentTag })
-    //   }
-    // })
+    }    
 
     maps.event.addDomListener(document, "keyup", e => {
       if(e.target.tagName !== "INPUT"){
@@ -219,9 +206,9 @@ export default class MapComponent extends Component {
     
     // Adding drawing options
     const dm = new maps.drawing.DrawingManager({ map, drawingControl: false })
-    maps.event.addListener(dm, "polygoncomplete", shape => this.addEventHandlers(shape, "polygon", "draw"))
-    maps.event.addListener(dm, "circlecomplete", shape => this.addEventHandlers(shape, "circle", "draw"))
-    maps.event.addListener(dm, "rectanglecomplete", shape => this.addEventHandlers(shape, "rectangle", "draw"))
+    maps.event.addListener(dm, "polygoncomplete", shape => this.addShapeAndEventHandlers(shape, "polygon", "draw"))
+    maps.event.addListener(dm, "circlecomplete", shape => this.addShapeAndEventHandlers(shape, "circle", "draw"))
+    maps.event.addListener(dm, "rectanglecomplete", shape => this.addShapeAndEventHandlers(shape, "rectangle", "draw"))
     
     this.setState({
       mapsApiLoaded: true,
@@ -237,27 +224,26 @@ export default class MapComponent extends Component {
 
     currentTag.shapes.forEach(s => {
       s.selected = false
-      s.outer.setMap(null)
+      s.outer.setOptions({ map: null, editable: false })      
       s.shape.setEditable(false)
-      s.outer.setEditable(false)
     })
-    // currentTag.showInfluenceShape = true
 
     currentShape.selected = true
     currentShape.shape.setEditable(true)
-    currentShape.outer.setEditable(true)
-    currentShape.outer.setMap(mapInstance)
-    this.setState({ currentTag })
+    currentShape.outer.setOptions({ map: mapInstance, editable: true })
+    this.setState({ currentTag, currentShape })
   }
 
-  addEventHandlers = (shape, type, method, area, currentTag) => {    
+  addShapeAndEventHandlers = (shape, type, method, area, currentTag) => {
+    this.setState({ undoRedo: { enabled: false, type: "undo" } })
     if (method === "draw") currentTag = this.state.currentTag
 
     let { mapsApi, mapInstance, drawingManager } = this.state
     , sph = mapsApi.geometry.spherical
     , shapeId = rand(8)
-    , rectEventType = null
     , polyEventType = null
+    , circEventType = null
+    , rectEventType = null
     , outer
     , outerShapeProps = {
       strokeColor: currentTag.color,
@@ -265,15 +251,12 @@ export default class MapComponent extends Component {
       strokeWeight: 2,
       fillColor: currentTag.color,
       fillOpacity: 0.35,
-      // editable: true,
       suppressUndo: true,
-      // clickable: true,
-      // draggable: true,
       zIndex: 0
     }
     , shapeObj = {}
     , inf_poly
-    // let np = sph.interpolate(start, pt, 1.008)
+    , undoRedo = { shape: {}, outer: {} } // undo / redo
 
     if (method === "fetch") inf_poly = area.influence_polygon
     // l(currentTag.id, this.state.currentTag.id)
@@ -282,7 +265,6 @@ export default class MapComponent extends Component {
     shape.shapeId = shapeId
     shape.addListener("click", () => this.shapeSelected(shape))
     shape.addListener("drag", () => this.shapeSelected(shape))
-    // shape.setOptions({ clickable: false })
 
     switch(type){
       case "polygon":
@@ -398,15 +380,59 @@ export default class MapComponent extends Component {
           })  
         }
 
-        shape.addListener("radius_changed", () => {
+        // Center change listeners
+        // 'dragstart' used because it fires once, and center_changed fires continuously
+        shape.addListener("dragstart", () => { 
           let currentShape = findShapeGroupById(currentTag.shapes, shape.shapeId)
-          currentShape.outer.setRadius(currentShape.shape.getRadius() + currentShape.influence)
+          
+          // capturing prev position when dragging starts
+          currentShape.undoRedo.shape.center.prev = currentShape.undoRedo.shape.center.curr
+          this.setState({ 
+            undoRedo: { enabled: true, type: "undo", time: 10 }
+          }, this.undoRedoTimer)
+        })
+        
+        shape.addListener("dragend", () => {
+          let currentShape = findShapeGroupById(currentTag.shapes, shape.shapeId)
+          
+          // capturing end position when dragging stops
+          currentShape.undoRedo.shape.center.curr = currentShape.shape.getCenter()          
+          // l("prev",  currentShape.undoRedo.shape.center.prev.lat(), "curr", currentShape.undoRedo.shape.center.curr.lat())          
+        })
+        
+        shape.addListener("center_changed", () => {
+          undoRedoObj.action = "center_changed"
+          let currentShape = findShapeGroupById(currentTag.shapes, shape.shapeId)
+
+          if(undoRedoObj.clicked){
+            // l("Via undo/redo", "action: ", undoRedoObj.action)
+            undoRedoObj.clicked = false
+            
+            // swap curr and prev position
+            currentShape.undoRedo.shape.center.prev = currentShape.undoRedo.shape.center.curr
+            currentShape.undoRedo.shape.center.curr = currentShape.shape.getCenter()
+            // l("prev lat",  currentShape.undoRedo.shape.center.prev.lat(), "curr lat", currentShape.undoRedo.shape.center.curr.lat())
+          }
+
+          currentShape.outer.setCenter(currentShape.shape.getCenter())
           setNewShape(currentShape)
         })
+        
+        // Radius change listeners
+        shape.addListener("radius_changed", () => {
+          undoRedoObj.action = "radius_changed_inner"
 
-        shape.addListener("center_changed", () => {
           let currentShape = findShapeGroupById(currentTag.shapes, shape.shapeId)
-          currentShape.outer.setCenter(currentShape.shape.getCenter())
+          currentShape.undoRedo.shape.radius.prev = currentShape.undoRedo.shape.radius.curr
+          currentShape.undoRedo.shape.radius.curr = currentShape.shape.getRadius()
+
+          // l("prev",  currentShape.undoRedo.shape.radius.prev, "curr", currentShape.undoRedo.shape.radius.curr)
+          
+          circEventType = "fromSelf_inner" // to differentiate between manual and auto radius change of outer shape
+          currentShape.outer.setRadius(currentShape.shape.getRadius() + currentShape.influence)
+          this.setState({ 
+            undoRedo: { enabled: true, type: "undo", time: 10 }
+          }, this.undoRedoTimer)
           setNewShape(currentShape)
         })
 
@@ -438,11 +464,22 @@ export default class MapComponent extends Component {
                 
         outer.setMap(null)
         outer.addListener("radius_changed", () => {
+          if(circEventType !== "fromSelf_inner"){
+            undoRedoObj.action = "radius_changed_outer"
+            this.setState({ 
+              undoRedo: { enabled: true, type: "undo", time: 10 }
+            }, this.undoRedoTimer)
+          }
+          circEventType = null
+
           // Change influence according to new radius
           let currentShape = findShapeGroupById(currentTag.shapes, outer.shapeId)
           
           currentTag.shapes.forEach(s => s.selected = false)
           currentShape.selected = true
+
+          currentShape.undoRedo.outer.radius.prev = currentShape.undoRedo.outer.radius.curr
+          currentShape.undoRedo.outer.radius.curr = currentShape.outer.getRadius()
 
           currentShape.influence = Math.round(currentShape.outer.getRadius() - currentShape.shape.getRadius())
           if (currentShape.influence < this.props.influence){
@@ -451,6 +488,10 @@ export default class MapComponent extends Component {
           }
           setNewShape(currentShape)
         })
+
+        undoRedo.shape.radius = { prev: shape.getRadius(), curr: shape.getRadius() }
+        undoRedo.shape.center = { prev: shape.getCenter(), curr: shape.getCenter() }
+        undoRedo.outer.radius = { prev: outer.getRadius(), curr: outer.getRadius() }
 
         break
       
@@ -626,35 +667,20 @@ export default class MapComponent extends Component {
     }
 
     outer.shapeId = shapeId
-    outer.addListener("click", () => this.shapeSelected(outer))
-     // outer.addListener("click", e => { l(e); this.shapeSelected(outer) })
-    outer.setOptions({
-      map: null, 
-      clickable: false
-    })
+    outer.setOptions({ map: null,  clickable: false })
 
     currentTag.shapes.forEach(s => {
       s.selected = false
-      s.shape.setOptions({
-        editable: false
-      })
-      s.outer.setOptions({
-        editable: false,
-        map: null
-      })
+      s.shape.setOptions({ editable: false })
+      s.outer.setOptions({ editable: false, map: null })
     })
     shapeObj = {
       shapeId, // For drawing operations
       type,
       shape,
       outer,
-      // selected: true,
-      getInfPos: function () {
-        // if (!this.undo && !this.undoNotAllowed) return this.outer.getTopRight()
-        // if (currentTag.showInfluenceShape) return this.outer.getTopRight()
-        // return this.shape.getTopRight()
-        return this.outer.getTopRight()
-      },
+      undoRedo, // Undo / redo
+      getInfPos: function () { return this.outer.getTopRight() },
     }
     if (method === "draw") {
       shapeObj.id = null // For API operations
@@ -820,7 +846,7 @@ export default class MapComponent extends Component {
             break
         }
 
-        this.addEventHandlers(shape, area.properties.type, "fetch", area, tag)
+        this.addShapeAndEventHandlers(shape, area.properties.type, "fetch", area, tag)
       })
     })
   }
@@ -874,8 +900,7 @@ export default class MapComponent extends Component {
   }
 
   tagDeselected = () => {
-    let { tags, drawingManager } = this.state
-      , canDraw = false
+    let { tags, drawingManager } = this.state, canDraw = false
 
     tags.forEach(t => {
       t.active = false
@@ -888,30 +913,27 @@ export default class MapComponent extends Component {
           draggable: false,
           editable: false,
         })
-        // s.shape.clickable(false)
-        // s.shape.setDraggable(false)
-        // s.shape.setEditable(false)
-        // s.outer.setMap(null)
-        s.outer.setOptions({
-          editable: false,
-          map: null
-        })
+        s.outer.setOptions({ editable: false, map: null })
       })
     })
     drawingManager.setDrawingMode(null)
-    this.setState({ currentTag: null, tags, canDraw })
+    this.setState({ 
+      currentTag: null, tags, canDraw, 
+      undoRedo: { enabled: false, type: "undo" }
+    })
   }
 
   tagDeleted = tag => {
-    let { tags } = this.state
-    , canDraw = false
+    let { tags } = this.state, canDraw = false
 
     // Delete tags
     tags = tags.filter(t => t.id !== tag.id)
-    this.setState({ tags, canDraw, currentTag: null })
+    this.setState({ 
+      currentTag: null, tags, canDraw, 
+      undoRedo: { enabled: false, type: "undo" }
+    })
 
     // Delete drawn shapes
-    // currentTag = null
     tag.shapes.forEach(s => {
       s.shape.setMap(null)
       s.outer.setMap(null)
@@ -919,49 +941,6 @@ export default class MapComponent extends Component {
 
     // Reset palette
     palette.filter(c => c.tagId === tag.id)[0].tagId = null
-  }
-
-  // Sets influence to 0, hides the outer shape
-  clearInfluence = currShape => {
-    // l(currShape)
-    let { currentTag, mapsApi } = this.state
-    currShape.outer.setMap(null)
-    currShape.undo = true
-    currShape.undoTime = 10
-    this.setState({ currentTag })
-
-    currShape.interval = setInterval(() => {
-      currShape.undoTime-=1
-      if (currShape.undoTime === 0) {
-        clearInterval(currShape.interval)
-        currShape.undo = false
-        currShape.undoNotAllowed = true
-        currShape.influence = 0
-        
-        switch (currShape.type) {
-          case "polygon":
-            mapsApi.event.clearListeners(currShape.outer, "set_at")
-            mapsApi.event.clearListeners(currShape.outer, "insert_at")
-            break;
-          case "circle":
-            mapsApi.event.clearListeners(currShape.outer, "radius_changed")
-            break;
-          default:
-            mapsApi.event.clearListeners(currShape.outer, "bounds_changed")
-            break;
-        }
-      }
-      this.setState({ currentTag })
-    }, 1000)
-  }
-  
-  undoClearInfluence = currShape => {
-    // l(currShape)
-    let { currentTag, mapInstance } = this.state
-    currShape.outer.setMap(mapInstance)
-    currShape.undo = false
-    clearInterval(currShape.interval)
-    this.setState({ currentTag })
   }
 
   // Resets influence to 3m (default), keeps outer shape  
@@ -994,6 +973,61 @@ export default class MapComponent extends Component {
     this.setState({ currentTag })
   }
 
+  // Undo / redo
+  undoRedoAction = type => {
+    let { currentTag, currentShape } = this.state
+
+    undoRedoObj.clicked = true
+
+    switch(currentShape.type){
+      case "circle": 
+        switch(undoRedoObj.action){
+          case "radius_changed_inner":
+            currentShape.shape.setRadius(currentShape.undoRedo.shape.radius.prev)
+          break;
+          
+          case "radius_changed_outer":
+            currentShape.outer.setRadius(currentShape.undoRedo.outer.radius.prev)
+          break;
+
+          default: // "center_changed"
+            currentShape.shape.setCenter(currentShape.undoRedo.shape.center.prev)
+          break;
+        }
+
+      break;
+
+      case "polygon": break;
+
+      default: break;
+    }
+
+    
+    this.setState({
+      currentTag, currentShape,
+      undoRedo: { enabled: true, time: 10, type } // "redo" / "undo"
+    }, this.undoRedoTimer)
+  }
+
+  // 10s timer for undo / redo
+  undoRedoTimer = () => {
+    let { undoRedo } = this.state, time
+    
+    clearInterval(undoRedoObj.interval)
+    undoRedoObj.interval = setInterval(() => {
+      // l(undoRedo.time)
+      undoRedo.time-=1
+      time = undoRedo.time
+      this.setState(prev => ({ undoRedo: { ...prev.undoRedo, time } }) )
+
+      // End condition
+      if (time === 0) {
+        clearInterval(undoRedoObj.interval)
+        this.setState(prev => ({ undoRedo: { ...prev.undoRedo, enabled: false } }) )
+      }
+    }, 1000)
+  }
+  
   save = () => {
     cl()
     l("createArray", createArray)
@@ -1218,7 +1252,10 @@ export default class MapComponent extends Component {
   }
   
   showNotification = notifType => {
-    this.setState({ showNotif: true, notifType })
+    this.setState({ 
+      showNotif: true, notifType,
+      undoRedo: { enabled: false, type: "undo" }
+     })
     clearTimeout(submitTimer)
     submitTimer = setTimeout(() => {
       this.setState({ showNotif: false, notifType: "" })
@@ -1249,8 +1286,8 @@ export default class MapComponent extends Component {
   render() {
     const { 
       mapsApiLoaded, mapInstance, mapsApi, 
-      currentTag, tags, canDraw, 
-      showNotif, notifType, sidebarHidden 
+      currentTag, tags, canDraw, undoRedo, 
+      showNotif, notifType, sidebarHidden
     } = this.state
     , sidebarClass = `sidebar${sidebarHidden ? " hidden":""}`
 
@@ -1351,7 +1388,7 @@ export default class MapComponent extends Component {
                     lat={s.getInfPos().lat()}
                     lng={s.getInfPos().lng()}
                     text={`${s.influence} m`}
-                    onClearInfluence={() => this.clearInfluence(s)}
+                    // onClearInfluence={() => this.clearInfluence(s)}
                     onResetInfluence={() => this.resetInfluence(s)}
                     undo={s.undo}
                     undoTime={s.undoTime}
@@ -1393,6 +1430,21 @@ export default class MapComponent extends Component {
                 <img className="pr" src="assets/square-grey.svg" alt="" />
                 <img className="sc" src="assets/square-active.svg" alt="" />
               </div>
+            </div>
+            <div className="undo-btns" ref={this.undobtns}>
+              {undoRedo.enabled && <>
+              <div 
+                className={`ctn-icon ${undoRedo.type === "undo" ? "" : "disabled"}`} 
+                onClick={() => { undoRedo.type === "undo" && this.undoRedoAction("redo") } }>
+                <img src="assets/corner-up-left.svg" alt="" />
+              </div>
+              <div 
+                className={`ctn-icon ${undoRedo.type === "redo" ? "" : "disabled"}`} 
+                onClick={() => { undoRedo.type === "redo" && this.undoRedoAction("undo") } }>
+                <img src="assets/corner-up-right.svg" alt="" />
+              </div>
+              <span>&nbsp;&nbsp;{undoRedo.time}s</span>
+              </>}
             </div>
             <button className="btn-accent" onClick={this.save} ref={this.savebtn}>Save</button>
             {showNotif && <div className="notif">

@@ -36,6 +36,7 @@
 		align-items: stretch;
 		.sidebar {
       width: $sb-mg;
+      min-width: $sb-mg;
 			padding: $sb-pd;
 			background: $w;
 			box-shadow: 1px 0 0 0 rgba($b, .05);
@@ -96,7 +97,7 @@
 		}
 		.content {
       @extend %fhw;
-		  // width: calc(100% - 260px);    
+		  // width: calc(100% - #{$sb-mg});    
 			.ctn-icon{
 				@extend %j-c;
 				height: 40px;
@@ -195,7 +196,29 @@
 						}
 					}
 				}
-			}
+      }
+      .undo-btns{
+        margin-top: 10px;
+        .ctn-icon{
+          display: inline-flex;
+          &:first-child{
+            margin-right: 16px;
+          }
+          &.disabled{ 
+						cursor: not-allowed;
+            img{ opacity: .8; }
+          }
+        }
+        span{
+          font-family: $sp-r;
+          font-size: 15px;
+          font-weight: bold;
+          margin-left: 5px;
+          display: inline-block;
+          vertical-align: middle;
+          height: 40px;
+        }
+      }
 			.notif{
 				// display: none;
 				@extend %j-c;
