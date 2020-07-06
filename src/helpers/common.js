@@ -22,3 +22,4 @@ export const generateColor = () => {
   }
   return color
 }
+export const coords = arr => arr.forEach((el, idx)  => { l(idx, "lat:", el.lat(), "lng:", el.lng()) })

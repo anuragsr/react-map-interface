@@ -4,7 +4,7 @@ import React, { Component } from 'react'
 import $ from 'jquery'
 import GoogleMapReact from 'google-map-react'
 import Switch from 'react-switch'
-import { l, cl, auth, generateColor, sp, rand, randBetween } from '../helpers/common'
+import { l, cl, auth, generateColor, sp, rand, randBetween, coords } from '../helpers/common'
 
 import SearchBox from './SearchBox'
 import AutoComplete from './AutoComplete'
@@ -76,8 +76,11 @@ let palette = [
 , undoRedoObj = { action: "", clicked: false, interval: {} }
 , setNewPath = () => {}
 , polyOuterListener = () => {}
-, vertexSelected = false
-, deleteMarker
+, vertexObj = { vertex: 0, selected: false, marker: {} }
+, resetVertexObj = () => {
+  vertexObj.marker.setMap(null)
+  vertexObj.selected = false
+}
 
 export default class MapComponent extends Component {
   constructor(props){
@@ -178,21 +181,36 @@ export default class MapComponent extends Component {
         if (currentTag){
           switch (key) {
             case 8:
-              let selected = currentTag.shapes.filter(s => s.selected), selectedShape
+              let selected = currentTag.shapes.filter(s => s.selected), currentShape
               if(selected.length){
-                selectedShape = selected[0]
-                // // Check if it is a polygon, whether a vertex is selected
-                // if(selectedShape.type === "polygon"){
-                //   if(vertexSelected){
-                //     l("delete vertex")
-                //   } else {
-                //     this.prepareShapeToDelete(selectedShape, currentTag)
-                //   }
-                // } else{
-                //   this.prepareShapeToDelete(selectedShape, currentTag)
-                // }
+                currentShape = selected[0]
+
+                // Check if it is a polygon, whether a vertex is selected
+                if(currentShape.type === "polygon" && vertexObj.selected){
+                  // l("delete vertex", vertexObj.vertex)
+                  let arr = currentShape.shape.getPath().getArray()
+                  arr.splice(vertexObj.vertex, 1)
+                  // coords(arr)
+
+                  // This added so that the listeners are added as well
+                  undoRedoObj.action = "vertex_removed"
+                  undoRedoObj.clicked = true 
+
+                  this.setState({
+                    currentTag, currentShape,
+                    undoRedo: { enabled: true, time: 10, type: "undo" } // "redo" / "undo"
+                  }, this.undoRedoTimer)
+
+                  // l("prev")
+                  // coords(currentShape.undoRedo.shape.path.prev)
+                  // l("curr")
+                  // coords(arr)
+
+                  currentShape.shape.setPath(arr)
+                  setNewPath()
+
+                } else this.prepareShapeToDelete(currentShape, currentTag)                
                 
-                this.prepareShapeToDelete(selectedShape, currentTag)
               } else this.tagDeleted(currentTag)
               
             break
@@ -217,7 +235,8 @@ export default class MapComponent extends Component {
     })  
 
     // For deleting vertices on a polygon
-    deleteMarker = new this.state.mapsApi.Circle({ 
+    vertexObj.marker = new this.state.mapsApi.Circle({ 
+      radius: 50,
       strokeColor: "#000000",
       strokeOpacity: 0.8,
       strokeWeight: 2,
@@ -225,14 +244,14 @@ export default class MapComponent extends Component {
       fillOpacity: 0.35,
       suppressUndo: true,
       zIndex: 0
-     })
+    })
   }
   
   prepareShapeToDelete = (selectedShape, currentTag) => {
     // Remove current shape from map
     selectedShape.shape.setMap(null)
     selectedShape.outer.setMap(null) 
-    deleteMarker.setMap(null) 
+    resetVertexObj()
 
     // Remove current shape from tag
     currentTag.shapes = currentTag.shapes.filter(s => s.shapeId !== selectedShape.shapeId)
@@ -253,10 +272,9 @@ export default class MapComponent extends Component {
   }
   
   shapeSelected = shape => {
-    // if(this.state.currentShape && shape.shapeId !== this.state.currentShape.shapeId){
-    //   deleteMarker.setMap(null)
-    //   vertexSelected = false
-    // }
+    if(this.state.currentShape && shape.shapeId !== this.state.currentShape.shapeId){
+      resetVertexObj()
+    }
     
     let { currentTag, mapInstance } = this.state
     , currentShape = findShapeGroupById(currentTag.shapes, shape.shapeId)
@@ -303,11 +321,8 @@ export default class MapComponent extends Component {
     
     drawingManager.setDrawingMode(null)
     shape.shapeId = shapeId
-    shape.addListener("click", () => {
-      // if(shape.type !== "polygon") 
-      this.shapeSelected(shape)
-    })
-    shape.addListener("drag", () => this.shapeSelected(shape))
+    shape.addListener("click", () => this.shapeSelected(shape))
+    shape.addListener("drag" , () => this.shapeSelected(shape))
 
     switch(type){
       case "polygon":
@@ -317,27 +332,29 @@ export default class MapComponent extends Component {
           let currentShape = findShapeGroupById(currentTag.shapes, shape.shapeId)
           // l(evt, currentShape.shape) 
           
-          // if(typeof evt.vertex !== "undefined" && currentShape.type === "polygon"){
-          //   let arr = currentShape.shape.getPath().getArray()
-          //   if(arr.length > 3) {
-          //     vertexSelected = true
-          //     deleteMarker.setOptions({
-          //       radius: 50,
-          //       center: evt.latLng,
-          //       map: mapInstance,
-          //       strokeColor: currentTag.color,
-          //       fillColor: currentTag.color
-          //     })
+          if(typeof evt.vertex !== "undefined" && currentShape.type === "polygon"){
+            // l(evt.latLng.lat(), evt.latLng.lng())
+
+            let arr = currentShape.shape.getPath().getArray()
+            if(arr.length > 3) {
+              vertexObj.vertex = evt.vertex
+              vertexObj.selected = true
+              vertexObj.marker.setOptions({
+                center: evt.latLng,
+                map: mapInstance,
+                strokeColor: currentTag.color,
+                fillColor: currentTag.color
+              })
   
-          //     arr.forEach(el  => {
-          //       l("lat:", el.lat(), "lng:", el.lng())
-          //     })
-          //   }
-          // }
+              // arr.forEach(el  => {
+              //   l("lat:", el.lat(), "lng:", el.lng())
+              // })
+            }
+          }
           
-          l(evt)
+          // l(evt)
           if(typeof evt.vertex !== "undefined" || evt.edge) { // For editable points on vertices or midpoints on edges
-            currentShape.undoRedo.shape.path.prev = [...currentShape.undoRedo.shape.path.curr]            
+            currentShape.undoRedo.shape.path.prev = [...currentShape.undoRedo.shape.path.curr]    
           }
         })
 
@@ -380,13 +397,15 @@ export default class MapComponent extends Component {
         setNewPath = () => {
           // l('setNewPath, polyEventType', polyEventType)
           let currentShape = findShapeGroupById(currentTag.shapes, outer.shapeId)
-
+          
           if(undoRedoObj.clicked){
             undoRedoObj.clicked = false
             
-            // swap curr and prev position
-            currentShape.undoRedo.shape.path.prev = [...currentShape.undoRedo.shape.path.curr]
-            currentShape.undoRedo.shape.path.curr = currentShape.shape.getPath().getArray()
+            if(!vertexObj.selected){ // Only if a vertex has not been deleted
+              // swap curr and prev position
+              currentShape.undoRedo.shape.path.prev = [...currentShape.undoRedo.shape.path.curr]
+              currentShape.undoRedo.shape.path.curr = currentShape.shape.getPath().getArray()
+            }
 
             shape.getPath().addListener("set_at" , () => { polyInnerListener("vertexChanged") })
             shape.getPath().addListener("insert_at", () => { polyInnerListener("vertexAdded") })
@@ -425,6 +444,7 @@ export default class MapComponent extends Component {
 
           currentShape.outer.getPath().addListener("set_at", polyOuterListener)
           currentShape.outer.getPath().addListener("insert_at", polyOuterListener)
+          resetVertexObj()
 
           currentTag.shapes.forEach(s => s.selected = false)
           currentShape.selected = true
@@ -1199,7 +1219,7 @@ export default class MapComponent extends Component {
     let { currentTag, currentShape, mapsApi } = this.state
 
     undoRedoObj.clicked = true
-    l(undoRedoObj)
+    l(undoRedoObj)  
 
     switch(currentShape.type){
       case "polygon": 
@@ -1220,6 +1240,7 @@ export default class MapComponent extends Component {
             currentShape.outer.getPath().addListener("insert_at", polyOuterListener)
           break;
 
+          case 'vertex_removed':
           default: // 'changed_inner':
             currentShape.shape.setPath(currentShape.undoRedo.shape.path.prev)
             currentShape.undoRedo.shape.path.prev = [...currentShape.undoRedo.shape.path.curr]
