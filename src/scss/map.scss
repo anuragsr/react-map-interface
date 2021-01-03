@@ -28,7 +28,7 @@
 	    }
 	    img.avatar{ @include hw(36, 36); }
 	  }
-	}	
+	}
 	.wrapper {
 		display: flex;
 		width: 100%;
@@ -97,7 +97,7 @@
 		}
 		.content {
       @extend %fhw;
-		  // width: calc(100% - #{$sb-mg});    
+		  // width: calc(100% - #{$sb-mg});
 			.ctn-icon{
 				@extend %j-c;
 				height: 40px;
@@ -124,7 +124,7 @@
 			.search-bar{
 				font-family: $sp-r;
 				margin: 10px;
-				margin-top: 0;				
+				margin-top: 0;
 				z-index: 1 !important;
 				.search-box{
 					font-size: 17px;
@@ -134,7 +134,7 @@
 					border: none;
 					box-shadow: 0 1px 4px 0 rgba($b, .3);
 					transition: all .2s;
-					&.closed{						
+					&.closed{
 						width: 0;
 						padding: 0;
 						border: none;
@@ -145,7 +145,7 @@
 			.react-autosuggest__container{
 				display: inline-block;
 				vertical-align: top;
-				margin-top: 10px;				
+				margin-top: 10px;
 				.tag-inp{
 					border: 1px solid $bg-pr;
 					height: 44px;
@@ -167,9 +167,9 @@
 					margin-bottom: 0;
 					li.react-autosuggest__suggestion{
 						margin-bottom: 10px;
-						cursor: pointer;							
+						cursor: pointer;
 						img.tag-img{
-							margin-right: 20px;							
+							margin-right: 20px;
 						}
 					}
 				}
@@ -204,7 +204,7 @@
           &:first-child{
             margin-right: 16px;
           }
-          &.disabled{ 
+          &.disabled{
 						cursor: not-allowed;
             img{ opacity: .8; }
           }
@@ -227,7 +227,7 @@
 				bottom: 0;
 				height: 56px;
 				width: 100%;
-				font-size: 16px;				
+				font-size: 16px;
 				letter-spacing: 0.59px;
 				color: $w;
 				background: $bg-err;
@@ -240,7 +240,7 @@
 			// width: 85px;
 			background-color: $inf-bg;
 			font-size: 17px;
-			border-radius: 15px;			
+			border-radius: 15px;
 			padding: 10px;
 			color: $w;
 			font-family: $sp-r;
@@ -251,14 +251,14 @@
 			white-space: nowrap;
 			img{
 				cursor: pointer;
-        margin-left: 10px;	
+        margin-left: 10px;
         height: 18px;
 			}
 			a{
 				color: $w;
 			}
 		}
-		img.tag-img{				
+		img.tag-img{
 			height: 32px;
 			width: 32px;
 		}
