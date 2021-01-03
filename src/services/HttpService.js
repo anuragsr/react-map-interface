@@ -3,11 +3,21 @@ import axios from 'axios'
 const apiHost = 'https://api-admin-staging.oyster.ai'
 let call
 
-export default class HttpService {
-  
+export default class HttpService {  
   get(url, params, auth) {
     let config = {
       method: "get",
+      url: apiHost + url,
+      params,
+      auth
+    }
+
+    return this.doRequest(config)
+  }
+
+  delete(url, params, auth) {
+    let config = {
+      method: "delete",
       url: apiHost + url,
       params,
       auth

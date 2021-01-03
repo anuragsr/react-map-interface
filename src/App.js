@@ -4,7 +4,7 @@ import Cookies from 'universal-cookie'
 import Background from './components/Background'
 import MapComponent from './components/MapComponent'
 import HttpService from './services/HttpService'
-import { l, auth } from './helpers/common'
+import { l, auth, pd } from './helpers/common'
 
 import './scss/app.scss'
 
@@ -30,7 +30,7 @@ export default class App extends Component {
         password: ck.x_p
       }, this.login)
     }
-    // else{
+    // else {
     //   this.setState({
     //     username: 'contenter',
     //     password: 'ExXgB6QjfQUwyMm7gcEd'
@@ -47,12 +47,13 @@ export default class App extends Component {
   }
 
   login = e => {
-    e && e.preventDefault()
+    pd(e)
     // l(this.state)
     this.http
       .post('/api/v1/login', {
         username: this.state.username,
         password: this.state.password,
+        editor_page: true
       })
       .then(res => {
         l(res)
@@ -71,7 +72,6 @@ export default class App extends Component {
         // l(auth)
 
         this.setState({ isAuth: true })
-
       })
       .catch(err => {
         l(err)
@@ -79,8 +79,6 @@ export default class App extends Component {
         setTimeout(() => {
           this.setState({ showErr: false })
         }, 3000)
-
-        // this.setState({ isAuth: true })      
       })
   }
 
@@ -95,7 +93,7 @@ export default class App extends Component {
 
   render() {
     return (
-      <div className="app-outer">
+      <>
         {!this.state.isAuth && <div className="h-100">
           <Background />
           <div className="login-outer">
@@ -120,7 +118,8 @@ export default class App extends Component {
         {this.state.isAuth && <div className="h-100">
           <MapComponent logout={this.logout} />
         </div>}
-      </div>
+        {/* <MapComponent/> */}
+      </>
     )
   }
 }

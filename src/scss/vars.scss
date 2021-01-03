@@ -13,15 +13,14 @@ $cl-ctn-text: #292f36;
 $cl-sel: #145bbc;
 $cl-high: #b5d3fa;
 
-// $bg-pop: #010101;
-// $ctn-auto-bdr: #979797;
-// $bg-auto-high: #615959;
-// $bg-tag: #f9f9fb;
-// $sl-bg: #e9e9e9;
-// $dz-bdr: #dde4ff;
-// $dz-txt: #3f536e;
-// $up-err: #f25544;
-// $bg-prog: #d8e5ee;
+$tag-lbl: #666;
+$tag-bdr: #d0dce5;
+$tag-bg: #eff0f3;
+$inf-bg: #23374d;
+
+// Sidebar margin
+$sb-mg: 340px;
+$sb-pd: 10px;
 
 // Full height-width
 %fhw{  

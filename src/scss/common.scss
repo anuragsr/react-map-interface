@@ -3,8 +3,17 @@ html, body, #root, .app-outer{
 }
 
 body{
-  overflow-x: hidden;
-  overflow-y: auto;
+  overflow: hidden;
+}
+
+.noselect {
+  -webkit-touch-callout: none; /* iOS Safari */
+    -webkit-user-select: none; /* Safari */
+     -khtml-user-select: none; /* Konqueror HTML */
+       -moz-user-select: none; /* Firefox */
+        -ms-user-select: none; /* Internet Explorer/Edge */
+            user-select: none; /* Non-prefixed version, currently
+                                  supported by Chrome and Opera */
 }
 
 [placeholder]:empty:before {
@@ -14,24 +23,37 @@ body{
   color: $lgn-pl;
 }
 
-::selection {
-  background: $cl-high;
-}
-::-moz-selection {
-  background: $cl-high;
-}
-::-webkit-selection {
-  background: $cl-high;
+button:focus{
+  outline: none !important;
+  box-shadow: none !important;
 }
 
+input:focus{
+  outline: none !important;
+}
+
+// ::selection {
+//   background: $cl-high;
+// }
+// ::-moz-selection {
+//   background: $cl-high;
+// }
+// ::-webkit-selection {
+//   background: $cl-high;
+// }
+
 .btn-accent{
+  width: 97px;
+  height: 48px;
   color: $w;
   font-family: $sp-r;
-  font-size: 17px;
+  font-size: 19px;
   border-radius: 5px;
   box-shadow: inset -1px 1px 0 0 rgba($w, 0);
   border: 1px solid rgba($b, .05);
   background-color: $btn-pr;
+  margin: 10px;
+  margin-top: 20px;
   &:hover:enabled{
     background-color: darken($btn-pr, 10%);
   }
@@ -50,6 +72,9 @@ body{
   }
 }
 
+a{
+  cursor: pointer;
+}
 // .btn-anchor{
 //   background-color: $w;
 //   color: $lgn-pl;
