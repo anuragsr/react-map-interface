@@ -73,7 +73,7 @@ let palette = [
 , updateArray = []
 , deleteArray = []
 , submitTimer
-, undoRedoObj = { action: "", clicked: false, interval: {} }
+, undoRedoObj = { action: "", clicked: false, interval: 0 }
 , setNewPath = () => {}
 , polyOuterListener = () => {}
 , vertexObj = { vertex: 0, selected: false, marker: {} }
@@ -113,7 +113,7 @@ export default class MapComponent extends Component {
   static defaultProps = {
     center: { lat: 40.78343, lng: -73.96625 },
     zoom: 15,
-    influence: 3
+    influence: 1
   }
 
   componentDidMount(){
