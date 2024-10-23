@@ -1690,6 +1690,9 @@ export default class MapComponent extends Component {
   };
 
   save = () => {
+    this.showNotification("success");
+    return;
+
     cl();
     l("createArray", createArray);
     l("updateArray", updateArray);
