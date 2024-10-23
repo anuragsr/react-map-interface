@@ -12,7 +12,8 @@ import {
   sp,
   rand,
   randBetween,
-  coords
+  coords,
+  currentCenter
 } from "../helpers/common";
 
 import SearchBox from "./SearchBox";
@@ -130,6 +131,7 @@ export default class MapComponent extends Component {
 
   componentDidMount() {
     // l(mapStyles)
+    currentCenter.coordinates = [-73.96625, 40.78343];
   }
 
   toggleSidebar = () => {
@@ -251,6 +253,12 @@ export default class MapComponent extends Component {
     maps.event.addListener(dm, "rectanglecomplete", shape =>
       this.addShapeAndEventHandlers(shape, "rectangle", "draw")
     );
+
+    // Change center when dragged
+    map.addListener("center_changed", e => {
+      const location = map.getCenter();
+      currentCenter.coordinates = [location.lng(), location.lat()];
+    });
 
     this.setState({
       mapsApiLoaded: true,
@@ -1410,8 +1418,11 @@ export default class MapComponent extends Component {
     });
   };
 
-  placesChanged = places =>
+  placesChanged = places => {
+    const { location } = places[0].geometry;
+    currentCenter.coordinates = [location.lng(), location.lat()];
     this.state.mapInstance.setCenter(places[0].geometry.location);
+  };
 
   chooseColor = tag => {
     let availColors = palette.filter(c => !c.tagId),

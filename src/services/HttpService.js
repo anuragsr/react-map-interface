@@ -1,7 +1,7 @@
 import axios from "axios";
 import MockAdapter from "axios-mock-adapter";
 import * as turf from "@turf/turf";
-import { l, mock, rand, randBetween } from "../helpers/common";
+import { currentCenter, l, mock, rand, randBetween } from "../helpers/common";
 
 let apiHost = "",
   call;
@@ -15,7 +15,8 @@ const getRandomRadii = () => {
     };
   },
   getTagInfluence = () => {
-    const center = [-73.96625, 40.78343],
+    // const center = [-73.96625, 40.78343],
+    const center = currentCenter.coordinates,
       radius = 0.2,
       points = 25,
       randomPoints = turf.randomPoint(points, {
