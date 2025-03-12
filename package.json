@@ -5,7 +5,7 @@
   "private": true,
   "dependencies": {
     "@turf/turf": "^7.1.0",
-    "axios": "^0.19.2",
+    "axios": "^1.8.2",
     "axios-mock-adapter": "^2.0.0",
     "bootstrap": "^4.4.1",
     "caniuse-lite": "1.0.30001632",
